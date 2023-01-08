@@ -27,6 +27,8 @@ console_error_panic_hook = { version = "0.1.6", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
 getrandom = { version = "0.2", features = ["js"] }
 aes-gcm-siv = "0.11.1"
+hmac = "0.12.1"
+sha2 = "0.10.6"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"
