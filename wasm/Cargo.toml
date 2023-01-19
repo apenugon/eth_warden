@@ -12,7 +12,7 @@ default = ["console_error_panic_hook"]
 
 [dependencies]
 wasm-bindgen = "0.2.63"
-pbkdf2 = { version = "0.11", default-features = false }
+pbkdf2 = { version = "0.11", features = ["default", "password-hash"] }
 rand_core = { version = "0.6", features = ["std"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
@@ -29,6 +29,11 @@ getrandom = { version = "0.2", features = ["js"] }
 aes-gcm-siv = "0.11.1"
 hmac = "0.12.1"
 sha2 = "0.10.6"
+hex = "0.4.3"
+console_log = "0.2.0"
+log = "0.4.17"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.13"

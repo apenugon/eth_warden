@@ -5,3 +5,6 @@
 [submodule "lib/aes-circom"]
 	path = lib/aes-circom
 	url = https://github.com/Electron-Labs/aes-circom
+[submodule "lib/circomlib"]
+	path = lib/circomlib
+	url = https://github.com/iden3/circomlib
