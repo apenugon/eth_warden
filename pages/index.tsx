@@ -2,15 +2,23 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { Inter } from '@next/font/google'
 import styles from '../styles/Home.module.css'
-import { generate_key_from_password, greet } from '../wasm/pkg/wasm'
+import { generate_key_from_password, greet, generate_witness } from '../wasm/pkg/wasm'
 import { Button } from '@chakra-ui/react'
+
+const snarkjs = require('snarkjs')
 
 const inter = Inter({ subsets: ['latin'] })
 
 export default function Home() {
 
-  function displayHash() {
+  async function displayHash() {
     let pwd = generate_key_from_password("test password");
+    let witness = generate_witness(pwd, "This $/is my message to encrypt");
+    console.log("Witness in JS", witness);
+    console.log("Proving");
+    await snarkjs.groth16.fullProve(witness, "prove_encryption.wasm", "circuit_final.zkey");
+    console.log("Proving done");
+
     alert(pwd);
   }
 
