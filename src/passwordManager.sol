@@ -2,7 +2,7 @@ pragma solidity ^0.8.0;
 
 import { Verifier } from "./verifier.sol";
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "oz/contracts/proxy/utils/Initializable.sol";
 
 contract PasswordManager is Initializable {
     Verifier public verifier;
@@ -18,9 +18,14 @@ contract PasswordManager is Initializable {
 
     // Store the password here
     mapping(address => mapping(string => PasswordManager)) private passwordData;
+    mapping(address =>  string[]) private accountList;
+
+    function initialize(address _verifier) public initializer {
+        verifier = Verifier(_verifier);
+    }
 
     function addPassword(bytes32 label, bytes32 username, bytes32 encryptedPassword) public {
-        Verifier.verifyProof(label, username, encryptedPassword);
+        verifier.verifyProof(label, username, encryptedPassword);
         passwordData[msg.sender][label] = bytes32(keccak256(username, encryptedPassword));
     }
 

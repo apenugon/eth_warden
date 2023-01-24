@@ -16,8 +16,11 @@ export default function Home() {
     let witness = generate_witness(pwd, "This $/is my message to encrypt");
     console.log("Witness in JS", witness);
     console.log("Proving");
-    await snarkjs.groth16.fullProve(witness, "prove_encryption.wasm", "circuit_final.zkey");
+    let { proof, publicSignals } = await snarkjs.groth16.fullProve(witness, "prove_encryption.wasm", "circuit_final.zkey");
+    let calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
     console.log("Proving done");
+    console.log(proof, publicSignals);
+    console.log(calldata);
 
     alert(pwd);
   }
