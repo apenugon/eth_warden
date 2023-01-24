@@ -1,5 +1,6 @@
 mod utils;
 
+use rand::Rng;
 use rand_core::RngCore;
 use wasm_bindgen::prelude::*;
 use std::{str, convert::TryFrom};
@@ -23,8 +24,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub struct Witness {
     #[serde(with = "BigArray")]
     pub key: [u8; 32*8],
-    #[serde(with = "BigArray")]
-    pub iv: [u8; 16*8],
+    pub iv: u128,
     #[serde(with = "BigArray")]
     pub msg: [u8; 16*8],
 }
@@ -88,14 +88,13 @@ pub fn generate_witness(key: &str, msg: &str) -> JsValue {
     generate_binary_from_bytes(Vec::from(msg), &mut msg_bin);
     info!("Generated msg binary");
     info!("Message roundtrip: {}", str::from_utf8(&generate_bytes_from_binary(&msg_bin)).unwrap());
-    // Generate a random IV
-    let random_bytes: [u8; 12] = rand::random();
-    generate_binary_from_bytes(random_bytes.to_vec(), &mut iv_bin);
+    // Generate a random IV  with max 96 bits
+    let random_number = rand::thread_rng().gen_range(0u128..2u128.pow(96));
 
     // Generate the witness
     let witness = Witness {
         key: key_bin,
-        iv: iv_bin,
+        iv: random_number,
         msg: msg_bin,
     };
     info!("Witness generated: {:?}", witness);

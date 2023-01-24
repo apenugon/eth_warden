@@ -18,28 +18,29 @@ contract PasswordManager is Initializable {
     // Username should be encrypted, but only password will enforce that
 
     // Store the password here
-    mapping(address => mapping(bytes32 => PasswordManager)) private passwordData;
-    mapping(address =>  bytes32[]) private accountList;
+    mapping(address => mapping(bytes32 => AccountInfo)) public passwordData;
+    mapping(address =>  bytes32[]) public accountList;
 
-    function initialize(address _verifier) public initializer {
-        verifier = Verifier(_verifier);
+    function initialize() public initializer {
+        verifier = new Verifier();
     }
 
     function updateAccountInfo(
             uint[2] memory a,
             uint[2][2] memory b,
             uint[2] memory c,
-            uint[2] memory encrypted,
+            uint[3] memory input,
             bytes32 label,
             bytes32 username
         ) public {
 
-        verifier.verifyProof(a, b, c, encrypted);
-        if (!passwordData[msg.sender][label].isValue) {
+        bytes32 encrypted = bytes32(input[1] + (input[2] << 128));    
+        verifier.verifyProof(a, b, c, input);
+        if (passwordData[msg.sender][label].isValue == false) {
             accountList[msg.sender].push(label);
         }
-        AccountInfo accountInfo = AccountInfo(username, encrypted, 0, true);
-        passwordData[msg.sender][label] = AccountInfo;
+        AccountInfo memory accountInfo = AccountInfo(username, encrypted, 0, true);
+        passwordData[msg.sender][label] = accountInfo;
     }
 
     function deleteAccountInfo(bytes32 label) public {
@@ -54,7 +55,7 @@ contract PasswordManager is Initializable {
         }
     }
 
-    function getAccountInfo(bytes32 label) public view returns (AccountInfo) {
+    function getAccountInfo(bytes32 label) public view returns (AccountInfo memory) {
         return passwordData[msg.sender][label];
     }
 }
