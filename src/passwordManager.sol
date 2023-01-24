@@ -9,16 +9,16 @@ contract PasswordManager is Initializable {
 
     // Struct to hold username, password, and nonce
     struct AccountInfo {
-        string username;
-        string password;
-        string nonce;
+        bytes32 username;
+        bytes32 password;
+        bytes32 nonce;
     }
 
     // Username should be encrypted, but only password will enforce that
 
     // Store the password here
-    mapping(address => mapping(string => PasswordManager)) private passwordData;
-    mapping(address =>  string[]) private accountList;
+    mapping(address => mapping(bytes32 => PasswordManager)) private passwordData;
+    mapping(address =>  bytes32[]) private accountList;
 
     function initialize(address _verifier) public initializer {
         verifier = Verifier(_verifier);
@@ -31,6 +31,10 @@ contract PasswordManager is Initializable {
 
     function updatePassword(bytes32 label, bytes32 username, bytes32 encryptedPassword) public {
         passwordData[msg.sender][label] = bytes32(keccak256(username, encryptedPassword));
+    }
+
+    function deletePassword(bytes32 label) public {
+        delete passwordData[msg.sender][label];
     }
 
     function getPassword(bytes32 label) public view returns (bytes32) {
