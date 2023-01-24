@@ -12,6 +12,7 @@ contract PasswordManager is Initializable {
         bytes32 username;
         bytes32 password;
         bytes32 nonce;
+        bool isValue;
     }
 
     // Username should be encrypted, but only password will enforce that
@@ -24,20 +25,36 @@ contract PasswordManager is Initializable {
         verifier = Verifier(_verifier);
     }
 
-    function addPassword(bytes32 label, bytes32 username, bytes32 encryptedPassword) public {
-        verifier.verifyProof(label, username, encryptedPassword);
-        passwordData[msg.sender][label] = bytes32(keccak256(username, encryptedPassword));
+    function updateAccountInfo(
+            uint[2] memory a,
+            uint[2][2] memory b,
+            uint[2] memory c,
+            uint[2] memory encrypted,
+            bytes32 label,
+            bytes32 username
+        ) public {
+
+        verifier.verifyProof(a, b, c, encrypted);
+        if (!passwordData[msg.sender][label].isValue) {
+            accountList[msg.sender].push(label);
+        }
+        AccountInfo accountInfo = AccountInfo(username, encrypted, 0, true);
+        passwordData[msg.sender][label] = AccountInfo;
     }
 
-    function updatePassword(bytes32 label, bytes32 username, bytes32 encryptedPassword) public {
-        passwordData[msg.sender][label] = bytes32(keccak256(username, encryptedPassword));
-    }
-
-    function deletePassword(bytes32 label) public {
+    function deleteAccountInfo(bytes32 label) public {
+        require(passwordData[msg.sender][label].isValue, "Account does not exist");
         delete passwordData[msg.sender][label];
+        for (uint i = 0; i < accountList[msg.sender].length; i++) {
+            if (accountList[msg.sender][i] == label) {
+                accountList[msg.sender][i] = accountList[msg.sender][accountList[msg.sender].length - 1];
+                accountList[msg.sender].pop();
+                break;
+            }
+        }
     }
 
-    function getPassword(bytes32 label) public view returns (bytes32) {
+    function getAccountInfo(bytes32 label) public view returns (AccountInfo) {
         return passwordData[msg.sender][label];
     }
 }
