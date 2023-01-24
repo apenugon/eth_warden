@@ -26,7 +26,7 @@ pub struct Witness {
     #[serde(with = "BigArray")]
     pub iv: [u8; 16*8],
     #[serde(with = "BigArray")]
-    pub msg: [u8; 32*8],
+    pub msg: [u8; 16*8],
 }
 
 #[wasm_bindgen]
@@ -80,7 +80,7 @@ pub fn generate_witness(key: &str, msg: &str) -> JsValue {
     info!("Key and key length: {:?}, {}", hex::decode(key).unwrap(), key.len());
 
     let mut key_bin = [0u8; 32*8];
-    let mut msg_bin = [0u8; 32*8];
+    let mut msg_bin = [0u8; 16*8];
     let mut iv_bin = [0u8; 16*8];
 
     generate_binary_from_bytes(hex::decode(key).unwrap(), &mut key_bin);

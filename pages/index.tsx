@@ -13,7 +13,7 @@ export default function Home() {
 
   async function displayHash() {
     let pwd = generate_key_from_password("test password");
-    let witness = generate_witness(pwd, "This $/is my message to encrypt");
+    let witness = generate_witness(pwd, "This $/is my mes");
     console.log("Witness in JS", witness);
     console.log("Proving");
     let { proof, publicSignals } = await snarkjs.groth16.fullProve(witness, "prove_encryption.wasm", "circuit_final.zkey");
