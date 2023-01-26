@@ -55,6 +55,7 @@ describe("PasswordManagerTests", function () {
         expect(info.isValue).true;
 
         // Read password here in rust to make sure it's correct
+        
 
         const tx2 = await passwordManager.deleteAccountInfo(accountBytes);
         await tx2.wait();
