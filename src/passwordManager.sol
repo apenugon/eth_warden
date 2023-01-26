@@ -11,7 +11,7 @@ contract PasswordManager is Initializable {
     struct AccountInfo {
         bytes32 username;
         bytes32 password;
-        bytes32 nonce;
+        uint256 nonce;
         bool isValue;
     }
 
@@ -34,12 +34,12 @@ contract PasswordManager is Initializable {
             bytes32 username
         ) public {
 
-        bytes32 encrypted = bytes32(input[1] + (input[2] << 128));    
+        bytes32 encrypted = bytes32(input[0] + (input[1] << 128));    
         verifier.verifyProof(a, b, c, input);
         if (passwordData[msg.sender][label].isValue == false) {
             accountList[msg.sender].push(label);
         }
-        AccountInfo memory accountInfo = AccountInfo(username, encrypted, 0, true);
+        AccountInfo memory accountInfo = AccountInfo(username, encrypted, input[2], true);
         passwordData[msg.sender][label] = accountInfo;
     }
 
