@@ -1,8 +1,26 @@
 import { assert } from "console";
 const snarkjs = require('snarkjs');
 
-import { generate_key_from_password, generate_encrypt_info } from "../wasm/pkg/wasm";
+let wasm_location = "../wasm/pkg/wasm"
+
+//import { generate_key_from_password, generate_encrypt_info } from wasm_location;
+const processing_module = require(wasm_location);
+const { generate_encrypt_info, decrypt_infos } = processing_module;
 import { formatBytes32String } from "ethers/lib/utils";
+import { PasswordManager } from "../typechain-types";
+
+export type DecryptionInput = {
+    username: string,
+    password: string,
+    account_label: string,
+    nonce: string
+}
+
+export type DecryptionOutput = {
+    username: string,
+    password: string,
+    label: string,
+}
 
 export async function getCalldataFromMessage(
     username: string, 
@@ -21,8 +39,7 @@ export async function getCalldataFromMessage(
             let utf8_label = Buffer.from(account_label, 'utf8').toString();
             assert(utf8_username.length <= 32);
             assert(utf8_label.length <= 32);
-            let pwd = generate_key_from_password(encryption_password);
-            let info = generate_encrypt_info(pwd, account_password, utf8_username, utf8_label);
+            let info = generate_encrypt_info(encryption_password, account_password, utf8_username, utf8_label);
             console.log(info);
             console.log(formatBytes32String(utf8_username))
             let prover_path = "prove_encryption.wasm";
@@ -42,4 +59,10 @@ export async function getCalldataFromMessage(
                 info.enc_username]
 
 
+}
+
+export function decrypt(infos: PasswordManager.AccountInfoViewStructOutput[], encryption_password: string): DecryptionOutput[] {
+    // Eventually wrap in some try catch
+
+    return decrypt_infos(infos, encryption_password);
 }

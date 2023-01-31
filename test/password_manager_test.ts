@@ -1,10 +1,8 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { getCalldataFromMessage } from "../utils/zkutils";
+import { getCalldataFromMessage, decrypt } from "../utils/zkutils";
 import fs from "fs";
-
-const snarkjs = require('snarkjs');
 
 import { formatBytes32String } from "ethers/lib/utils";
 
@@ -23,9 +21,11 @@ describe("PasswordManagerTests", function () {
         const PasswordManager = await hre.ethers.getContractFactory("PasswordManager");
         const passwordManager = await PasswordManager.deploy();
         await passwordManager.deployed();
+        console.log(passwordManager.address);
         expect(await passwordManager.address).not.to.deep.equal("");
         expect(await passwordManager.verifier()).to.deep.equal("")
-        await passwordManager.initialize();
+        const tx = await passwordManager.initialize();
+        expect((await tx.wait(1)).confirmations).to.deep.equal(1);
         expect(await passwordManager.verifier()).not.to.deep.equal("");
     });
     
@@ -43,24 +43,28 @@ describe("PasswordManagerTests", function () {
             "testaccount", 
             "test_enc_pass");
         const tx = await passwordManager.updateAccountInfo(...params);
-        await tx.wait();
-        expect(tx.blockNumber !== undefined);
+        let receipt = await tx.wait(1);
+        expect(receipt.confirmations).greaterThanOrEqual(1);
 
-        const accountBytes = formatBytes32String("testaccount");
+        let account_label_bytes = params[4];
 
-        const info = await passwordManager.getAccountInfo(accountBytes);
-        expect(info.username).to.deep.equal(formatBytes32String("testuser"));
+        const info = await passwordManager.getAccountInfo(account_label_bytes);
+        expect(info.username).to.deep.equal(params[5]);
         expect(info.password).to.not.be.null;
         expect(info.nonce).to.not.deep.equal("0");
         expect(info.isValue).true;
 
         // Read password here in rust to make sure it's correct
-        
+        const allAccounts = await passwordManager.fetchAllAccountInfo();
+        expect(allAccounts.length).to.deep.equal(1);
+        let decrypted = decrypt(allAccounts, "test_enc_pass");
+        expect(decrypted[0].username).to.deep.equal(params[5]);
+        expect(decrypted[0].password).to.deep.equal("testPASS1234!@)&");
 
-        const tx2 = await passwordManager.deleteAccountInfo(accountBytes);
+        const tx2 = await passwordManager.deleteAccountInfo(account_label_bytes);
         await tx2.wait();
 
-        const deletedInfo = await passwordManager.getAccountInfo(accountBytes);
+        const deletedInfo = await passwordManager.getAccountInfo(account_label_bytes);
         expect(deletedInfo.username).to.deep.equal("");
         expect(deletedInfo.password).to.deep.equal("");
         expect(deletedInfo.nonce).to.deep.equal("0");

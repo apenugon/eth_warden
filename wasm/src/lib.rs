@@ -6,22 +6,15 @@ use aes_gcm_siv::{
 use rand::Rng;
 use rand_core::RngCore;
 use wasm_bindgen::prelude::*;
-use std::{str, convert::TryFrom, string::FromUtf8Error};
+use std::{str, convert::{TryFrom, TryInto}, string::FromUtf8Error};
 use pbkdf2::{
-    password_hash::{PasswordHasher, Salt, Output, SaltString},
+    password_hash::{PasswordHasher, SaltString},
     Algorithm, Params, Pbkdf2,
 };
-use sha2::Sha256;
-use hmac::Hmac;
 use serde::{Serialize, Deserialize};
 use serde_big_array::BigArray;
-
+use bn_rs::{BigNumber};
 use log::{Level, info};
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Witness {
@@ -39,11 +32,20 @@ pub struct EncryptedInformation {
     pub enc_label: String
 }
 
+#[derive(Deserialize, Debug)]
+pub struct ContractAccountInfo {
+    pub username: String,
+    pub password: String,
+    pub label: String,
+    pub nonce: BigNumber,
+}
+
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DecryptedInformation {
     pub username: String,
+    pub password: String,
     pub label: String,
-    pub password: String
 }
 
 
@@ -84,16 +86,17 @@ pub fn generate_key_from_password(pw: &str) -> String {
 }
 
 #[wasm_bindgen]
-pub fn generate_encrypt_info(key: &str, msg: &str, username: &str, label: &str) -> JsValue {
+pub fn generate_encrypt_info(encryption_password: &str, msg: &str, username: &str, label: &str) -> JsValue {
     // Generate a witness from a key and a message
     // Turn key into a binary array
 
-    info!("Key and key length: {:?}, {}", hex::decode(key).unwrap(), key.len());
+    let key = generate_key_from_password(encryption_password);
+    info!("Key: {:?}", hex::decode(&key).unwrap());
 
     let mut key_bin = [0u8; 32*8];
     let mut msg_bin = [0u8; 16*8];
 
-    generate_binary_from_bytes(hex::decode(key).unwrap(), &mut key_bin);
+    generate_binary_from_bytes(hex::decode(&key).unwrap(), &mut key_bin);
     info!("Generated key binary");
     generate_binary_from_bytes(Vec::from(msg), &mut msg_bin);
     info!("Generated msg binary");
@@ -101,9 +104,9 @@ pub fn generate_encrypt_info(key: &str, msg: &str, username: &str, label: &str) 
     // Generate a random IV  with max 96 bits
     let random_number = rand::thread_rng().gen_range(0u128..2u128.pow(96));
 
-    let binding = number_to_u8(random_number);
+    let binding = number_to_u8(&random_number);
     let nonce = Nonce::from_slice(&binding);
-    let cipher = Aes256GcmSiv::new_from_slice(&hex::decode(key).unwrap()).unwrap();
+    let cipher = Aes256GcmSiv::new_from_slice(&hex::decode(&key).unwrap()).unwrap();
 
     info!("Encrypting");
     let enc_username = cipher.encrypt(nonce, username.as_bytes()).unwrap();
@@ -134,13 +137,36 @@ pub fn generate_encrypt_info(key: &str, msg: &str, username: &str, label: &str) 
 }
 
 #[wasm_bindgen]
-pub fn decrypt_info(key: &str, nonce: &str, enc_hex_username: &str, enc_hex_label: &str, enc_hex_password: &str) -> JsValue {
-    let nonce: u128 = nonce.parse().unwrap();
+pub fn decrypt_infos(infos: JsValue, encryption_password: &str) -> JsValue {
+    info!("Deserializing");
+    let res = serde_wasm_bindgen::from_value(infos); 
+    let infos: Vec<ContractAccountInfo> = match res {
+        Ok(v) => v,
+        Err(e) => {
+            info!("Error: {}", e);
+            return "Error".into();
+        }
+    }; 
+
+    info!("Decrypting infos");
+    let key = generate_key_from_password(encryption_password);
+    let mut decrypted_infos = Vec::new();
+    for info in infos {
+        info!("Decrypting info");
+        let nonce: u128 = info.nonce.try_into().unwrap(); 
+        let decrypted_info = decrypt_info(&key, &nonce, &info.username, &info.password, &info.label);
+        decrypted_infos.push(decrypted_info);
+    }
+    serde_wasm_bindgen::to_value(&decrypted_infos).unwrap()
+}
+
+fn decrypt_info(key: &str, nonce: &u128, enc_hex_username: &str, enc_hex_label: &str, enc_hex_password: &str) -> DecryptedInformation {
+
     let enc_username = hex::decode(enc_hex_username).unwrap();
     let enc_password: Vec<u8> = hex::decode(enc_hex_password).unwrap();
     let enc_label: Vec<u8> = hex::decode(enc_hex_label).unwrap();
 
-    let binding = number_to_u8(nonce);
+    let binding = number_to_u8(&nonce);
     let nonce = Nonce::from_slice(&binding);
     let cipher = Aes256GcmSiv::new_from_slice(&hex::decode(key).unwrap()).unwrap();
 
@@ -148,18 +174,16 @@ pub fn decrypt_info(key: &str, nonce: &str, enc_hex_username: &str, enc_hex_labe
     let password = cipher.decrypt(nonce, enc_password.as_slice()).unwrap();
     let label = cipher.decrypt(nonce, enc_label.as_slice()).unwrap();
 
-    let decrypted_info = DecryptedInformation {
+    DecryptedInformation {
         username: str::from_utf8(&username).unwrap().to_owned(),
         password: str::from_utf8(&password).unwrap().to_owned(),
         label: str::from_utf8(&label).unwrap().to_owned(),
-    };
-
-    serde_wasm_bindgen::to_value(&decrypted_info).unwrap()
+    }
 }
 
 // convert number to u8 byte array
 // Input should actually only be 96 bits, will get truncated otherwise
-fn number_to_u8(number: u128) -> [u8; 12] {
+fn number_to_u8(number: &u128) -> [u8; 12] {
     let mut bytes = [0u8; 12];
     for i in 0..12 {
         bytes[i] = ((number >> (i * 8)) & 0xff) as u8;

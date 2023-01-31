@@ -15,7 +15,14 @@ contract PasswordManager is Initializable {
         bool isValue;
     }
 
-    // Username should be encrypted, but only password will enforce that
+    struct AccountInfoView {
+        bytes32 username;
+        bytes32 password;
+        bytes32 label;
+        uint256 nonce;
+    }
+
+    // Only password field is *verifiably* encrypted by a zk snark. Other fields can be managed however a given frontend prefers it.
 
     // Store the password here
     mapping(address => mapping(bytes32 => AccountInfo)) public passwordData;
@@ -57,5 +64,15 @@ contract PasswordManager is Initializable {
 
     function getAccountInfo(bytes32 label) public view returns (AccountInfo memory) {
         return passwordData[msg.sender][label];
+    }
+
+    // This function is only meant to be used off chain code
+    function fetchAllAccountInfo() public view returns (AccountInfoView[] memory) {
+        AccountInfoView[] memory accountInfoViews = new AccountInfoView[](accountList[msg.sender].length);
+        for (uint i = 0; i < accountList[msg.sender].length; i++) {
+            AccountInfo memory accountInfo = passwordData[msg.sender][accountList[msg.sender][i]];
+            accountInfoViews[i] = AccountInfoView(accountInfo.username, accountInfo.password, accountList[msg.sender][i], accountInfo.nonce);
+        }
+        return accountInfoViews;
     }
 }

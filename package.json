@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "hardhat test",
     "build_rust": "wasm-pack build --dev && cargo run"
   },
   "jest": {
@@ -45,6 +46,7 @@
     "chai": "^4.3.7",
     "hardhat": "^2.12.6",
     "hardhat-preprocessor": "^0.1.5",
-    "ts-node": "^10.9.1"
+    "ts-node": "^10.9.1",
+    "typechain-types": "file:./typechain-types"
   }
 }
