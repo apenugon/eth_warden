@@ -5,6 +5,7 @@ import { getCalldataFromMessage, decrypt } from "../utils/zkutils";
 import fs from "fs";
 
 import { formatBytes32String } from "ethers/lib/utils";
+import { test_decryption } from "../wasm/pkg/wasm";
 
 const importObject = {
 }
@@ -16,6 +17,16 @@ describe("PasswordManagerTests", function () {
         const { generate_key_from_password, generate_witness } = (await mod).instance.exports
         return { generate_key_from_password, generate_witness }
     }
+
+    it("Should encrypt and decrypt", async function () {
+        let encryption_password = "test_enc_pas"
+        let params = await getCalldataFromMessage(
+            "testuser", 
+            "testPASS1234!@)", 
+            "testaccount", 
+            "password");
+        test_decryption(encryption_password, params[3][0], params[3][1], params[3][2]);
+    });
 
     it("Should deploy the contract and initialize it", async function () {
         const PasswordManager = await hre.ethers.getContractFactory("PasswordManager");
@@ -39,10 +50,12 @@ describe("PasswordManagerTests", function () {
 
         let params = await getCalldataFromMessage(
             "testuser", 
-            "testPASS1234!@)&", 
+            "testPASS1234!@)", 
             "testaccount", 
-            "test_enc_pass");
+            "test_enc_pas");
         const tx = await passwordManager.updateAccountInfo(...params);
+        let calldata = passwordManager.interface.encodeFunctionData("updateAccountInfo", params);
+        console.log("TX data", calldata);
         let receipt = await tx.wait(1);
         expect(receipt.confirmations).greaterThanOrEqual(1);
 
@@ -57,7 +70,8 @@ describe("PasswordManagerTests", function () {
         // Read password here in rust to make sure it's correct
         const allAccounts = await passwordManager.fetchAllAccountInfo();
         expect(allAccounts.length).to.deep.equal(1);
-        let decrypted = decrypt(allAccounts, "test_enc_pass");
+        expect(allAccounts[0].label).to.deep.equal(params[4]);
+        let decrypted = decrypt(allAccounts, "test_enc_pas");
         expect(decrypted[0].username).to.deep.equal(params[5]);
         expect(decrypted[0].password).to.deep.equal("testPASS1234!@)&");
 

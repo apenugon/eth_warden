@@ -1,26 +1,32 @@
 mod utils;
 
 use aes_gcm_siv::{
-    Nonce, Aes256GcmSiv, aead::{Aead, KeyInit}
+    Nonce, Aes256GcmSiv, aead::{Aead, KeyInit}, AesGcmSiv
 };
-use rand::Rng;
+use rand::{Rng, random};
 use rand_core::RngCore;
-use wasm_bindgen::prelude::*;
-use std::{str, convert::{TryFrom, TryInto}, string::FromUtf8Error};
-use pbkdf2::{
-    password_hash::{PasswordHasher, SaltString},
-    Algorithm, Params, Pbkdf2,
+use wasm_bindgen::{prelude::*, throw_str};
+use std::{str, convert::{TryFrom, TryInto}, string::FromUtf8Error, error::Error};
+use argon2::{
+    password_hash::{
+        rand_core::OsRng,
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
+    },
+    Argon2
 };
+
 use serde::{Serialize, Deserialize};
 use serde_big_array::BigArray;
 use bn_rs::{BigNumber};
 use log::{Level, info};
 
+
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Witness {
     #[serde(with = "BigArray")]
     pub key: [u8; 32*8],
-    pub iv: u128,
+    pub iv: String,
     #[serde(with = "BigArray")]
     pub msg: [u8; 16*8],
 }
@@ -32,14 +38,13 @@ pub struct EncryptedInformation {
     pub enc_label: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ContractAccountInfo {
     pub username: String,
     pub password: String,
     pub label: String,
-    pub nonce: BigNumber,
+    pub nonce: String,
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DecryptedInformation {
@@ -54,154 +59,251 @@ extern {
     fn alert(s: &str);
 }
 
-#[wasm_bindgen]
-pub fn generate_key_from_password(pw: &str) -> String {
+pub fn generate_key_from_password(pw: &str) -> Vec<u8> {
     // Generate a new key from a password using pbkdf2
 
     // No salt here, another time
     // Hash password to PHC string ($pbkdf2-sha256$...)
     // TODO: Implement salt, right now this is not done at all
-    console_log::init_with_level(Level::Info);
     info!("Generating key from password: {}", pw);
-    let salt = SaltString::b64_encode(&[0,0,0,0]).unwrap();
-    let hash = Pbkdf2.hash_password_customized(
-        pw.as_bytes(),
-        Some(Algorithm::Pbkdf2Sha256.ident()),
-        None,
-        Params { rounds: 10000, output_length: 32 },
-        &salt,    
-    );
+    let salt = SaltString::b64_encode(&[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]).unwrap();
+    let argon2 = Argon2::default();
+    let hash = argon2.hash_password(pw.as_bytes(), salt.as_ref());
     let binding = match hash {
         Ok(phash) => phash.hash.unwrap(),
         Err(e) => {
-            info!("Error: {}", e);
-            return "Error".into();
+            throw_str(&format!("Error: {}", e));
         }
     };
     info!("Password hashed");
-    let bytes = binding.as_bytes();
-    let hex_rep = hex::encode(&bytes);
-    info!("Generated hex: {}, hex length: {}, bytes length: {}", hex_rep, hex_rep.len(), bytes.len());
-    return hex_rep.into();
+    binding.as_bytes().to_vec()
+    
 }
 
 #[wasm_bindgen]
 pub fn generate_encrypt_info(encryption_password: &str, msg: &str, username: &str, label: &str) -> JsValue {
     // Generate a witness from a key and a message
     // Turn key into a binary array
-
-    let key = generate_key_from_password(encryption_password);
-    info!("Key: {:?}", hex::decode(&key).unwrap());
+    console_log::init_with_level(Level::Info);
+    let key: Vec<u8> = generate_key_from_password(encryption_password).into();
+    info!("Key: {:?}", &key);
 
     let mut key_bin = [0u8; 32*8];
     let mut msg_bin = [0u8; 16*8];
-
-    generate_binary_from_bytes(hex::decode(&key).unwrap(), &mut key_bin);
+    let mut v_msg = Vec::from(msg);
+    v_msg.insert(0, v_msg.len() as u8); 
+    generate_binary_from_bytes(key.to_vec(), &mut key_bin);
     info!("Generated key binary");
-    generate_binary_from_bytes(Vec::from(msg), &mut msg_bin);
+    generate_binary_from_string(v_msg, &mut msg_bin);
     info!("Generated msg binary");
     info!("Message roundtrip: {}", str::from_utf8(&generate_bytes_from_binary(&msg_bin)).unwrap());
     // Generate a random IV  with max 96 bits
-    let random_number = rand::thread_rng().gen_range(0u128..2u128.pow(96));
+    let random_number: u128 = 54822174152160929529777032685; //rand::thread_rng().gen_range(0u128..2u128.pow(96));
+    info!("Random number nonce: {}", random_number);
 
-    let binding = number_to_u8(&random_number);
+    let binding = &random_number.to_le_bytes()[0..12];
     let nonce = Nonce::from_slice(&binding);
-    let cipher = Aes256GcmSiv::new_from_slice(&hex::decode(&key).unwrap()).unwrap();
+    let cipher = Aes256GcmSiv::new_from_slice(&key.into_boxed_slice()).unwrap();
 
     info!("Encrypting");
-    let enc_username = cipher.encrypt(nonce, username.as_bytes()).unwrap();
-    let enc_password = cipher.encrypt(nonce, label.as_bytes()).unwrap();
+    info!("Label: {}", label);
+    let mut enc_username = cipher.encrypt(nonce, username.as_bytes()).unwrap();
+    let mut enc_label = cipher.encrypt(nonce, label.as_bytes()).unwrap();
+
+
+    // print enc username and label lengths
+    info!("Encrypted username length: {}", enc_username.len());
+    info!("Encrypted label length: {}", enc_label.len());
+
+    // Add length of the encrypted message to the beginning of the username/message, so we know how long it is for decoding
+    // This is why we are limited to 31 bytes for the username and label
+    enc_username.insert(0, enc_username.len() as u8);
+    enc_label.insert(0, enc_label.len() as u8);
+
     info!("Done encrypting");
     let mut user32 = [0u8; 32];
-    let mut pass32 = [0u8; 32];
+    let mut label32 = [0u8; 32];
 
     user32[..enc_username.len()].copy_from_slice(&enc_username);
-    pass32[..enc_password.len()].copy_from_slice(&enc_password);
+    label32[..enc_label.len()].copy_from_slice(&enc_label);
 
-    info!("Encrypted username: {:?}", user32);
-
+    info!("Enc label, {:?}", label32);
     // Generate the witness
     let witness = Witness {
         key: key_bin,
-        iv: random_number,
+        iv: random_number.to_string(),
         msg: msg_bin,
     };
 
     let enc_info = EncryptedInformation {
         witness,
         enc_username: "0x".to_owned()+&hex::encode(user32),
-        enc_label: "0x".to_owned()+&hex::encode(pass32),
+        enc_label: "0x".to_owned()+&hex::encode(label32),
     };
+    info!("Encrypted info: {:?}", enc_info);
+
 
     serde_wasm_bindgen::to_value(&enc_info).unwrap()
 }
 
 #[wasm_bindgen]
+pub fn test_decryption(encryption_password: &str, part_1: &str, part_2: &str, nonce: &str) {
+    // parts to output
+    let raw_output_0: u128 = u128::from_str_radix(part_1, 10).unwrap();
+    let raw_output_1: u128 = u128::from_str_radix(part_2, 10).unwrap();
+
+    let raw_output_0_le = raw_output_0.to_le_bytes();
+    let raw_output_1_le = raw_output_1.to_le_bytes();
+
+    let raw_pw = [raw_output_1_le, raw_output_0_le].concat();
+
+    let nonce_raw: u128 = u128::from_str_radix(nonce, 10).unwrap();
+    info!("out 0: {}, out 1: {}, nonce: {}", raw_output_0, raw_output_1, nonce_raw);
+    let private_key = generate_key_from_password(encryption_password);
+
+    let binding = &nonce_raw.to_le_bytes()[0..12];
+    let nonce = Nonce::from_slice(&binding);
+    
+    println!("Private key: {:?}", private_key);
+
+    let cipher = match Aes256GcmSiv::new_from_slice(&private_key.into_boxed_slice()) {
+        Ok(c) => c,
+        Err(e) => {
+            panic!("Invalid length");
+        }
+    };
+
+    let mut v_msg = Vec::from("testPASS1234!@)");
+    v_msg.insert(0, v_msg.len() as u8); 
+
+    let compared_pw = cipher.encrypt(nonce, v_msg.as_slice()).unwrap();
+    // Convert compared_pw to big endian
+    let mut compared_pw_be = [0u8; 32];
+    for i in 0..32 {
+        // convert byte to big endian - flip bits
+        let mut byte = compared_pw[i];
+        let mut flipped_byte = 0;
+        for j in 0..8 {
+            flipped_byte += (byte & 1) << (7-j);
+            byte >>= 1;
+        }
+        compared_pw_be[i] = flipped_byte;
+    }
+    
+    let output = cipher.decrypt(nonce, raw_pw.as_slice()).unwrap();
+
+    println!("Output: {:?}", output);
+}
+
+#[wasm_bindgen]
 pub fn decrypt_infos(infos: JsValue, encryption_password: &str) -> JsValue {
+    console_log::init_with_level(Level::Info);
     info!("Deserializing");
     let res = serde_wasm_bindgen::from_value(infos); 
     let infos: Vec<ContractAccountInfo> = match res {
         Ok(v) => v,
         Err(e) => {
-            info!("Error: {}", e);
-            return "Error".into();
+            throw_str(&format!("Error with serde: {}", e));
         }
     }; 
 
     info!("Decrypting infos");
     let key = generate_key_from_password(encryption_password);
     let mut decrypted_infos = Vec::new();
+    let cipher = match Aes256GcmSiv::new_from_slice(&key.into_boxed_slice()) {
+        Ok(c) => c,
+        Err(e) => {
+            throw_str(&format!("Error with creating cipher: {}", e));
+        }
+    };
     for info in infos {
         info!("Decrypting info");
-        let nonce: u128 = info.nonce.try_into().unwrap(); 
-        let decrypted_info = decrypt_info(&key, &nonce, &info.username, &info.password, &info.label);
-        decrypted_infos.push(decrypted_info);
+        let res = decrypt_info(&cipher, &info.nonce, &info.username, &info.label, &info.label);
+        match res {
+            Ok(v) => decrypted_infos.push(v),
+            Err(e) => {
+                throw_str(&format!("Error decrypting: {}", e));
+            }
+        }
     }
     serde_wasm_bindgen::to_value(&decrypted_infos).unwrap()
 }
 
-fn decrypt_info(key: &str, nonce: &u128, enc_hex_username: &str, enc_hex_label: &str, enc_hex_password: &str) -> DecryptedInformation {
+fn decrypt_info(cipher: &Aes256GcmSiv, nonce: &str, enc_hex_username: &str, enc_hex_label: &str, enc_hex_password: &str) -> Result<DecryptedInformation, Box<dyn std::error::Error>> {
 
-    let enc_username = hex::decode(enc_hex_username).unwrap();
-    let enc_password: Vec<u8> = hex::decode(enc_hex_password).unwrap();
-    let enc_label: Vec<u8> = hex::decode(enc_hex_label).unwrap();
+    let nonce: u128 = nonce.parse()?;
 
-    let binding = number_to_u8(&nonce);
+    let mut enc_username = hex::decode(enc_hex_username.split_at(2).1)?;
+    let mut enc_label: Vec<u8> = hex::decode(enc_hex_label.split_at(2).1)?;
+    let enc_password: Vec<u8> = hex::decode(enc_hex_password.split_at(2).1)?;
+
+    info!("Enc username length actual: {}", enc_username[0]);
+    info!("Enc label length actual: {:?} {}", enc_label, enc_label[0]);
+    info!("Enc password length actual: {}", enc_password.len());
+    // Reshape username and password from encoded length
+    enc_username.truncate(enc_username[0] as usize + 1);
+    enc_username.remove(0);
+    enc_label.truncate(enc_label[0] as usize + 1);
+    enc_label.remove(0);
+
+    let binding = &nonce.to_le_bytes()[0..12];
     let nonce = Nonce::from_slice(&binding);
-    let cipher = Aes256GcmSiv::new_from_slice(&hex::decode(key).unwrap()).unwrap();
 
-    let username = cipher.decrypt(nonce, enc_username.as_slice()).unwrap();
-    let password = cipher.decrypt(nonce, enc_password.as_slice()).unwrap();
-    let label = cipher.decrypt(nonce, enc_label.as_slice()).unwrap();
+    let username = cipher.decrypt(nonce, enc_username.as_slice())
+        .map_err(|e| String::from(&format!("Error decrypting user name: {}", e.to_string())))?;
+    let label = cipher.decrypt(nonce, enc_label.as_slice()).map_err(|e| String::from(&format!("Error decrypting label: {}", e.to_string())))?;
+    let mut password = cipher.decrypt(nonce, enc_password.as_slice()).map_err(|e| String::from(&format!("Error decrypting password: {}", e.to_string())))?;
 
-    DecryptedInformation {
-        username: str::from_utf8(&username).unwrap().to_owned(),
-        password: str::from_utf8(&password).unwrap().to_owned(),
-        label: str::from_utf8(&label).unwrap().to_owned(),
-    }
+    // Remove length of the encrypted message from the beginning of the username/message
+    password.truncate(password[0] as usize + 1);
+    password.remove(0);
+
+    Ok(DecryptedInformation {
+        username: str::from_utf8(&username)?.to_owned(),
+        password: str::from_utf8(&password)?.to_owned(),
+        label: str::from_utf8(&label)?.to_owned(),
+    })
 }
 
-// convert number to u8 byte array
-// Input should actually only be 96 bits, will get truncated otherwise
-fn number_to_u8(number: &u128) -> [u8; 12] {
-    let mut bytes = [0u8; 12];
-    for i in 0..12 {
-        bytes[i] = ((number >> (i * 8)) & 0xff) as u8;
-    }
-    bytes
-}
-
+// Input is little endian  (vec of bytes)
 fn generate_binary_from_bytes(input: Vec<u8>, output: &mut [u8]) {
     // Generate a binary array from a hex string
-    assert!(input.len() * 8 <= output.len(), "Input string too long");
+    if (input.len() * 8 > output.len()) {
+        throw_str("Input string too long");
+    }
+    let length = input.len();
     info!("Generating binary from bytes");
     let mut i = 0;
     for c in input {
         let bits = &format!("{:08b}", c);
-        println!("Bits: {}", bits);
+        println!("Bits: {} c: {:x}", bits, c);
         let mut j = 0;
         for c in bits.chars() {
-            let index = i * 8 + j;
+            let index = i * 8 + (7-j);
+
+            println!("J: {}, B: {}", j, c);
+            output[index] = c.to_digit(2).unwrap() as u8;
+            j += 1;
+        }
+        i += 1;
+    }
+}
+
+// The initial vec is big endian (from a string) - the binary output is 
+fn generate_binary_from_string(input: Vec<u8>, output: &mut [u8]) {
+    // Generate a binary array from a hex string
+    if (input.len() * 8 > output.len()) {
+        throw_str("Input string too long");
+    }
+    let length = input.len();
+    info!("Generating binary from bytes");
+    let mut i = 0;
+    for c in input {
+        let bits = &format!("{:08b}", c);
+        println!("Bits: {} c: {:x}", bits, c);
+        let mut j = 0;
+        for c in bits.chars() {
+            let index = (length - i - 1) * 8 + (7-j);
 
             println!("J: {}, B: {}", j, c);
             output[index] = c.to_digit(2).unwrap() as u8;
@@ -219,7 +321,9 @@ fn generate_bytes_from_binary(input: &[u8]) -> Vec<u8> {
         let mut byte = 0;
         for j in 0..8 {
             let index = i + j;
-            byte += input[index] << (7 - j);
+            println!("Index: {}, B: {}", index, input[index]);
+            assert!(input[index] == 0 || input[index] == 1);
+            byte += input[index] << j;
         }
         output.push(byte);
         i += 8;
@@ -227,3 +331,123 @@ fn generate_bytes_from_binary(input: &[u8]) -> Vec<u8> {
     output
 }
 
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use aes_gcm_siv::{Aes256GcmSiv, KeyInit, Nonce, aead::Aead};
+    use primitive_types::{U256, U512};
+
+    use crate::{generate_key_from_password, generate_bytes_from_binary, generate_binary_from_string, generate_binary_from_bytes};
+
+    #[test]
+    fn binary_bytes() {
+        // There is a bug here
+
+        let test_1 = Vec::from("ts");
+        let mut binary_1 = [0u8; 16];
+        super::generate_binary_from_string(test_1, &mut binary_1);
+        assert_eq!(binary_1[0], 1);
+
+        println!("Testing hello world");
+        let bytes = Vec::from("Hello World");
+        let mut binary = [0u8; 88];
+        super::generate_binary_from_bytes(bytes, &mut binary);
+        let bytes = super::generate_bytes_from_binary(&binary);
+        assert_eq!(bytes, Vec::from("Hello World"));
+        
+        println!("Testing key");
+        let private_key = generate_key_from_password("test_enc_pas");
+        let mut key_bin = [0u8; 32*8];
+        let pkey_clone = private_key.clone();
+        super::generate_binary_from_bytes(private_key, &mut key_bin);
+        let key_bytes = super::generate_bytes_from_binary(&key_bin);
+        assert_eq!(key_bytes, pkey_clone);
+    }
+
+    #[test]
+    fn parse_zk_output() {
+        let raw_output_0: u128 = 131273948142674397661556942260248217834;
+        let raw_output_1: u128 = 317295017284696336992010911869908711217;
+
+        let raw_output_0_le = raw_output_0.to_le_bytes();
+        let raw_output_1_le = raw_output_1.to_le_bytes();
+
+        let raw_pw = [raw_output_0_le, raw_output_1_le].concat();
+        let nonce_raw: u128 = 54822174152160929529777032685;
+        let mut private_key = generate_key_from_password("test_enc_pas");
+        private_key.reverse();
+        let binding = &nonce_raw.to_le_bytes()[0..12];
+        let nonce = Nonce::from_slice(&binding);
+        let nonce_circom: U256 = U256::from_dec_str("54822174152160929529777032685").unwrap();
+        let mut bytes_nonce = [0u8; 32];
+        nonce_circom.to_little_endian(&mut bytes_nonce);
+        println!("Private key: {:?}", private_key);
+
+        let cipher = match Aes256GcmSiv::new_from_slice(&private_key.into_boxed_slice()) {
+            Ok(c) => c,
+            Err(e) => {
+                panic!("Invalid length");
+            }
+        };
+
+        let mut v_msg = Vec::from("testPASS1234!@)");
+        v_msg.insert(0, v_msg.len() as u8); 
+
+        let bits_reve_circom: U256 = U256::from_dec_str("107969899493856550825927928274414867298691519239183300433621548449418343319786").expect("Invalid number");
+        let mut bytes_circom = [0; 32];
+        bits_reve_circom.to_little_endian(&mut bytes_circom);
+
+        let long_test_message: U512 = U512::from_dec_str("34301434124644589159264606949451511223195083389315069678936754058070721529496011742907303312901895405484342470946393").unwrap();
+        let mut bytes_long = [0; 64];
+        long_test_message.to_little_endian(&mut bytes_long);
+        //let decrypted_circom_bits = cipher.decrypt(nonce, &bytes_long.as_slice()[..48]).expect("Decryption failed");
+
+        let compared_pw = cipher.encrypt(nonce, v_msg.as_slice()).unwrap();
+        let mut compared_pw_bits = [0u8; 32*8];
+        let length = compared_pw.len();
+        generate_binary_from_bytes(compared_pw, &mut compared_pw_bits);
+        
+        let mut raw_pw_bits = [0u8; 32*8];
+        generate_binary_from_bytes(raw_pw, &mut raw_pw_bits);
+        println!("Circom pw bits: {:?}", raw_pw_bits);
+        println!("Compared pw bits: {:?}, len: {} bytes", compared_pw_bits, length);
+        // Convert compared_pw to big endian
+        /*
+        let mut compared_pw_be = [0u8; 32];
+        for i in 0..32 {
+            // convert byte to big endian - flip bits
+            let mut byte = compared_pw[i];
+            let mut flipped_byte = 0;
+            for j in 0..8 {
+                flipped_byte += (byte & 1) << (7-j);
+                byte >>= 1;
+            }
+            compared_pw_be[i] = flipped_byte;
+        }
+        */
+        //let output = cipher.decrypt(nonce, raw_pw.as_slice()).unwrap();
+
+        //println!("Output: {:?}", output);
+    }
+
+    #[test]
+    fn parse() {
+        let mut v_msg = Vec::from("testPASS1234!@)");
+        v_msg.insert(0, v_msg.len() as u8); 
+        let n: u128 = 20542784042969719753319256133717803049;
+        let n_le = n.to_le_bytes();
+        let n_be = n_le.iter().map(|b| b.reverse_bits()).collect::<Vec<u8>>();
+        // convert to string
+        let s = String::from_utf8_lossy(&n_le);
+        println!("S: {}", s);
+        // convert be to string
+        let s_be = String::from_utf8_lossy(&n_be);
+        println!("S BE: {}", s_be);
+
+        let new_password = "abcdefg123456789abcdefg123456789"; // 32 char pw
+        let mut output = [0u8; 32*8];
+        generate_binary_from_string(new_password.into(), &mut output);
+        println!("Bits: {:?}", output);
+    }
+}
