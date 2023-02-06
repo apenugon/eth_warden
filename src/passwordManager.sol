@@ -17,7 +17,8 @@ contract PasswordManager is Initializable {
 
     struct AccountInfoView {
         bytes32 username;
-        bytes32 password;
+        uint128 passwordPart1;
+        uint128 passwordPart2;
         bytes32 label;
         uint256 nonce;
     }
@@ -71,7 +72,9 @@ contract PasswordManager is Initializable {
         AccountInfoView[] memory accountInfoViews = new AccountInfoView[](accountList[msg.sender].length);
         for (uint i = 0; i < accountList[msg.sender].length; i++) {
             AccountInfo memory accountInfo = passwordData[msg.sender][accountList[msg.sender][i]];
-            accountInfoViews[i] = AccountInfoView(accountInfo.username, accountInfo.password, accountList[msg.sender][i], accountInfo.nonce);
+            uint128 password2 = uint128(uint256(accountInfo.password) >> 128);
+            uint128 password1 = uint128(uint256(accountInfo.password) & 0xffffffffffffffffffffffffffffffff);
+            accountInfoViews[i] = AccountInfoView(accountInfo.username, password1, password2, accountList[msg.sender][i], accountInfo.nonce);
         }
         return accountInfoViews;
     }

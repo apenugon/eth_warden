@@ -3,6 +3,11 @@ const snarkjs = require('snarkjs');
 
 let wasm_location = "../wasm/pkg/wasm"
 
+import { generate_binary_key_from_password } from "../wasm/pkg/wasm";
+
+import witness_gen from '../circuits/cc_prove_encryption/prove_encryption_js/witness_calculator'
+
+
 //import { generate_key_from_password, generate_encrypt_info } from wasm_location;
 const processing_module = require(wasm_location);
 const { generate_encrypt_info, decrypt_infos } = processing_module;
@@ -49,6 +54,7 @@ export async function getCalldataFromMessage(
                 prover_path = "public/prove_encryption.wasm";
                 circuit_path = "public/circuit_final.zkey";
             }
+            console.log(typeof(info.witness.key));
             let { proof, publicSignals } = await snarkjs.groth16.fullProve(info.witness, prover_path, circuit_path);
             console.log(proof, publicSignals);
             return [
@@ -62,18 +68,55 @@ export async function getCalldataFromMessage(
 
 }
 
-export function decrypt(infos: PasswordManager.AccountInfoViewStructOutput[], encryption_password: string): DecryptionOutput[] {
-    // Eventually wrap in some try catch
+var binArrayToJson = function(binArray: Uint8Array) {
+    var str = "[";
+    for (var i = 0; i < binArray.length; i++) {
+        str += binArray[i].toString()
+        if (i != binArray.length - 1) {
+            str += ",";
+        }
+    } 
+    str += "]";
+    console.log(str);
+    return JSON.parse(str)
+}
 
-    // Probably a more elegant way to do this
-    let inputs: DecryptionInput[] = infos.map((info) => {
+export async function decrypt(infos: PasswordManager.AccountInfoViewStructOutput[], encryption_password: string, wasm_buffer: undefined | any): DecryptionOutput[] {
+    // Eventually wrap in some try catch
+    if (wasm_buffer == undefined) {
+        const fs = require('fs');
+        wasm_buffer = fs.readFileSync('circuits/cc_prove_decryption/prove_decryption_js/prove_decryption.wasm');
+
+    }
+
+    const calc = await witness_gen(wasm_buffer);
+    console.log("Calc", calc);
+    let pkey: Uint8Array = generate_binary_key_from_password(encryption_password);
+    
+    
+    // Probably a more elegant way to do this. I'm using the ZK proof circom (without proving it)
+    // bc I couldn't figure out how to get it to work with the rust implementation, probably some 
+    // specific issue with implementations
+    let inputs: DecryptionInput[] = await Promise.all(infos.map(async (info) => {
+
+        let pstr = binArrayToJson(pkey);
+        console.log("Pstr", pstr)
+        let input = {
+            key: pstr,
+            iv: info.nonce.toString(),
+            encrypted: [info.passwordPart1.toString(), info.passwordPart2.toString()],
+        }
+        console.log(input);
+        const output = await calc.calculateWitness(input, encryption_password);
         return {
             username: info.username,
-            password: info.password,
+            password: output[1].toString(),
             label: info.label,
             nonce: info.nonce.toString()
         }
-    });
+    }));
     console.log(inputs);
+    pkey = Uint8Array.from([]); 
+    // idk if this is actually necessary but it made me feel good
     return decrypt_infos(inputs, encryption_password);
 }

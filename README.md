@@ -10,5 +10,4 @@ Basic approach:
 - Frontend manages key management etc
 
 TODO:
-- Get AES circom to play nice with AES rust package
 - Frontend

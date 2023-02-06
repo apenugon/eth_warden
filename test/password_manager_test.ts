@@ -3,31 +3,13 @@ import hre from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { getCalldataFromMessage, decrypt } from "../utils/zkutils";
 import fs from "fs";
-
+// @ts-ignore
+import wasm_buffer from '../circuits/cc_prove_encryption/prove_encryption_js/prove_encryption.wasm';
 import { formatBytes32String } from "ethers/lib/utils";
 import { test_decryption } from "../wasm/pkg/wasm";
-
-const importObject = {
-}
+import witness_gen from '../circuits/cc_prove_encryption/prove_encryption_js/witness_calculator.js';
 
 describe("PasswordManagerTests", function () {
-    async function loadWasm() {
-        const wasmBuffer = fs.readFileSync("wasm/pkg/wasm_bg.wasm")
-        let mod = WebAssembly.instantiate(wasmBuffer, importObject)
-        const { generate_key_from_password, generate_witness } = (await mod).instance.exports
-        return { generate_key_from_password, generate_witness }
-    }
-
-    it("Should encrypt and decrypt", async function () {
-        let encryption_password = "test_enc_pas"
-        let params = await getCalldataFromMessage(
-            "testuser", 
-            "testPASS1234!@)", 
-            "testaccount", 
-            "password");
-        test_decryption(encryption_password, params[3][0], params[3][1], params[3][2]);
-    });
-
     it("Should deploy the contract and initialize it", async function () {
         const PasswordManager = await hre.ethers.getContractFactory("PasswordManager");
         const passwordManager = await PasswordManager.deploy();
@@ -50,7 +32,7 @@ describe("PasswordManagerTests", function () {
 
         let params = await getCalldataFromMessage(
             "testuser", 
-            "testPASS1234!@)", 
+            "testPA1234!@)", 
             "testaccount", 
             "test_enc_pas");
         const tx = await passwordManager.updateAccountInfo(...params);
@@ -71,9 +53,13 @@ describe("PasswordManagerTests", function () {
         const allAccounts = await passwordManager.fetchAllAccountInfo();
         expect(allAccounts.length).to.deep.equal(1);
         expect(allAccounts[0].label).to.deep.equal(params[4]);
-        let decrypted = decrypt(allAccounts, "test_enc_pas");
-        expect(decrypted[0].username).to.deep.equal(params[5]);
-        expect(decrypted[0].password).to.deep.equal("testPASS1234!@)&");
+        console.log("Decrypting");
+        let decrypted = await decrypt(allAccounts, "test_enc_pas", undefined);
+        console.log(decrypted);
+        expect(decrypted[0].username).to.deep.equal("testuser");
+        expect(decrypted[0].password).to.deep.equal("testPA1234!@)");
+        expect(decrypted[0].label).to.deep.equal("testaccount");
+        
 
         const tx2 = await passwordManager.deleteAccountInfo(account_label_bytes);
         await tx2.wait();

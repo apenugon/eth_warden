@@ -2,27 +2,44 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { Inter } from '@next/font/google'
 import styles from '../styles/Home.module.css'
-import { generate_key_from_password, greet, generate_witness } from '../wasm/pkg/wasm'
 import { Button } from '@chakra-ui/react'
-
+import witness_gen from '../circuits/cc_prove_decryption/prove_decryption_js/witness_calculator'
+// @ts-ignore
+import wasm_buffer from '../circuits/cc_prove_decryption/prove_decryption_js/prove_decryption.wasm';
+import { read, readFileSync } from 'fs'
 const snarkjs = require('snarkjs')
+import testWitnessInput from '../circuits/cc_prove_decryption/input.json';
+import dataUriToBuffer from 'data-uri-to-buffer'
 
 const inter = Inter({ subsets: ['latin'] })
+
+function toBuffer(ab: ArrayBuffer) {
+  const buf = Buffer.alloc(ab.byteLength);
+  const view = new Uint8Array(ab);
+  for (let i = 0; i < buf.length; ++i) {
+      buf[i] = view[i];
+  }
+  return buf;
+}
+
+async function readRemoteFile (file: string) {
+  let response = await fetch(file)
+  if (!response.ok) {
+      throw new Error("HTTP error " + response.status);
+  }
+  return toBuffer(await response.arrayBuffer());
+}
 
 export default function Home() {
 
   async function displayHash() {
-    let pwd = generate_key_from_password("test password");
-    let witness = generate_witness(pwd, "This $/is my mes");
-    console.log("Witness in JS", witness);
-    console.log("Proving");
-    let { proof, publicSignals } = await snarkjs.groth16.fullProve(witness, "prove_encryption.wasm", "circuit_final.zkey");
-    let calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
-    console.log("Proving done");
-    console.log(proof, publicSignals);
-    console.log(calldata);
-
-    alert(pwd);
+    let wasmBuffer = await readRemoteFile(wasm_buffer);
+    let calc = await witness_gen(wasmBuffer);
+    console.log("Jere");
+    console.log(testWitnessInput);
+    const buff = await calc.calculateWitness(testWitnessInput, 0);
+    console.log(buff);
+    alert("Hello, world!");
   }
 
   return (

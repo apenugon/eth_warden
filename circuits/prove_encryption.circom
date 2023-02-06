@@ -29,6 +29,8 @@ template ProveEncryption () {
       a_encrypted_upper[i] = gcm_siv_enc_2_keys.CT[i+128];
    }
 
+   //for (i=0;i<256;i++) log(gcm_siv_enc_2_keys.CT[i], ",");
+
    component bits_to_num_lower = Bits2Num(128);
    component bits_to_num_upper = Bits2Num(128);
    bits_to_num_lower.in <== a_encrypted_lower;
