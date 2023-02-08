@@ -1,3 +1,6 @@
+// @Author: akulkid
+// License: GPL-3.0
+
 pragma solidity ^0.8.0;
 
 import { Verifier } from "./verifier.sol";
@@ -29,7 +32,7 @@ contract PasswordManager is Initializable {
     mapping(address => mapping(bytes32 => AccountInfo)) public passwordData;
     mapping(address =>  bytes32[]) public accountList;
 
-    function initialize() public initializer {
+    constructor() public {
         verifier = new Verifier();
     }
 

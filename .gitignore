@@ -3,6 +3,8 @@
 /cache_hardhat/
 /artifacts/
 /typechain-types/
+/.vscode/
+/.openzeppelin/
 # dependencies
 /node_modules
 /.pnp
@@ -39,3 +41,5 @@ yarn-error.log*
 next-env.d.ts
 
 /target/
+.env
+*~

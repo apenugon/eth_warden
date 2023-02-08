@@ -52,6 +52,7 @@ pub struct DecryptedInformation {
     pub username: String,
     pub password: String,
     pub label: String,
+    pub rawLabel: String
 }
 
 
@@ -126,7 +127,7 @@ pub fn generate_encrypt_info(encryption_password: &str, msg: &str, username: &st
     info!("Generated msg binary");
     info!("Message roundtrip: {}", str::from_utf8(&generate_bytes_from_binary(&msg_bin)).unwrap());
     // Generate a random IV  with max 96 bits
-    let random_number: u128 = 54822174152160929529777032685; //rand::thread_rng().gen_range(0u128..2u128.pow(96));
+    let random_number: u128 = rand::thread_rng().gen_range(0u128..2u128.pow(96));
     info!("Random number nonce: {}", random_number);
 
     let binding = &random_number.to_le_bytes()[0..12];
@@ -294,6 +295,7 @@ fn decrypt_info(cipher: &Aes256GcmSiv, nonce: &str, enc_hex_username: &str, enc_
         username: str::from_utf8(&username)?.to_owned(),
         password: recovered_password,
         label: str::from_utf8(&label)?.to_owned(),
+        rawLabel: enc_hex_label.to_owned(),
     })
 }
 

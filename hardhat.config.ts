@@ -8,6 +8,9 @@ import "hardhat-preprocessor";
 import fs from "fs";
 //import "@foundry-rs/hardhat-forge";
 import "@foundry-rs/hardhat-anvil";
+import "@openzeppelin/hardhat-upgrades";
+import dotenv from "dotenv";
+dotenv.config({path:__dirname+'/.env'})
 
 /*
 function getRemappings() {
@@ -23,7 +26,17 @@ const config: HardhatUserConfig = {
   defaultNetwork: "anvil",
   anvil: {
     launch: false,
-  },/*
+  },
+  etherscan: {
+    apiKey: "27JSTIYAVRGHG97WCZNXW65JYZAKKMVVFM",
+  },
+  networks: {
+    goerli: {
+      url: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [process.env.GOERLI_PRIVATE_KEY],
+    }
+  },
+  /*
   preprocess: {
     eachLine: (hre) => ({
       transform: (line: string) => {

@@ -1,18 +1,18 @@
-import { assert } from "console";
 const snarkjs = require('snarkjs');
 
-let wasm_location = "../wasm/pkg/wasm"
+let wasm_location = "../wasm/pkg-web/wasm"
 
-import { generate_binary_key_from_password } from "../wasm/pkg/wasm";
+import { generate_encrypt_info, decrypt_infos, generate_binary_key_from_password } from "../wasm/pkg-web/wasm";
 
-import witness_gen from '../circuits/cc_prove_encryption/prove_encryption_js/witness_calculator'
+import witness_gen from '../circuits/cc_prove_decryption/prove_decryption_js/witness_calculator'
 
 
 //import { generate_key_from_password, generate_encrypt_info } from wasm_location;
-const processing_module = require(wasm_location);
-const { generate_encrypt_info, decrypt_infos } = processing_module;
+//const processing_module = require(wasm_location);
+//const { generate_encrypt_info, decrypt_infos } = processing_module;
 import { formatBytes32String } from "ethers/lib/utils";
 import { PasswordManager } from "../typechain-types";
+import { isConstructorDeclaration } from "typescript";
 
 export type DecryptionInput = {
     username: string,
@@ -21,10 +21,18 @@ export type DecryptionInput = {
     nonce: string
 }
 
-export type DecryptionOutput = {
-    username: string,
-    password: string,
-    label: string,
+export class DecryptionOutput {
+    constructor() {
+        this.username = "";
+        this.password = "";
+        this.label = "";
+        this.rawLabel = "";
+    }
+
+    username: string;
+    password: string;
+    label: string;
+    rawLabel: string;
 }
 
 export async function getCalldataFromMessage(
@@ -43,8 +51,10 @@ export async function getCalldataFromMessage(
             let utf8_username = Buffer.from(username, 'utf8').toString();
             let utf8_label = Buffer.from(account_label, 'utf8').toString();
             // Need to leave room to pack length in
-            assert(utf8_username.length <= 31);
-            assert(utf8_label.length <= 31);
+            if (utf8_username.length > 31)
+                throw new Error("Username must be at most 31 bytes long utf8");
+            if (utf8_label.length > 31)
+                throw new Error("Label must be at most 31 bytes long utf8");
             let info = generate_encrypt_info(encryption_password, account_password, utf8_username, utf8_label);
             console.log(info);
             console.log(formatBytes32String(utf8_username))
@@ -81,7 +91,7 @@ var binArrayToJson = function(binArray: Uint8Array) {
     return JSON.parse(str)
 }
 
-export async function decrypt(infos: PasswordManager.AccountInfoViewStructOutput[], encryption_password: string, wasm_buffer: undefined | any): DecryptionOutput[] {
+export async function decrypt(infos: PasswordManager.AccountInfoViewStructOutput[], encryption_password: string, wasm_buffer: undefined | any): Promise<DecryptionOutput[]> {
     // Eventually wrap in some try catch
     if (wasm_buffer == undefined) {
         const fs = require('fs');
@@ -93,28 +103,31 @@ export async function decrypt(infos: PasswordManager.AccountInfoViewStructOutput
     console.log("Calc", calc);
     let pkey: Uint8Array = generate_binary_key_from_password(encryption_password);
     
+    let pstr = binArrayToJson(pkey);
+    console.log("Pstr", pstr)
     
     // Probably a more elegant way to do this. I'm using the ZK proof circom (without proving it)
     // bc I couldn't figure out how to get it to work with the rust implementation, probably some 
     // specific issue with implementations
-    let inputs: DecryptionInput[] = await Promise.all(infos.map(async (info) => {
+    let inputs: DecryptionInput[] = [];
+    for (const info of infos) {
 
-        let pstr = binArrayToJson(pkey);
-        console.log("Pstr", pstr)
-        let input = {
+        let witnessInput = {
             key: pstr,
             iv: info.nonce.toString(),
             encrypted: [info.passwordPart1.toString(), info.passwordPart2.toString()],
         }
-        console.log(input);
-        const output = await calc.calculateWitness(input, encryption_password);
-        return {
+        console.log("Into witness", witnessInput);
+        const witnessOutput = await calc.calculateWitness(witnessInput, encryption_password);
+        console.log("Out of witness", witnessOutput);
+        let newInput = {
             username: info.username,
-            password: output[1].toString(),
+            password: witnessOutput[1].toString(),
             label: info.label,
             nonce: info.nonce.toString()
         }
-    }));
+        inputs.push(newInput);
+    };
     console.log(inputs);
     pkey = Uint8Array.from([]); 
     // idk if this is actually necessary but it made me feel good
