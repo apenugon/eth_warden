@@ -9,7 +9,7 @@ import { ChakraProvider } from '@chakra-ui/react'
 
 
 const { chains, provider, webSocketProvider } = configureChains(
-  [goerli, foundry, mainnet, polygon],
+  [polygon],
   [publicProvider()],
 );
 

@@ -28,11 +28,15 @@ const config: HardhatUserConfig = {
     launch: false,
   },
   etherscan: {
-    apiKey: "27JSTIYAVRGHG97WCZNXW65JYZAKKMVVFM",
+    apiKey: "VBGZGJIM399ASZ5AUQFQITHCNPW1KKMYCQ",
   },
   networks: {
     goerli: {
       url: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [process.env.GOERLI_PRIVATE_KEY],
+    },
+    polygon: {
+      url: `https://polygon-mainnet.g.alchemy.com/v2/n86sM1cw1JPxN4u-Lu9BHp81qNT7CUCI`,
       accounts: [process.env.GOERLI_PRIVATE_KEY],
     }
   },

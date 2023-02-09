@@ -16,8 +16,11 @@ import { SetStateAction, useEffect, useState } from 'react'
 import { useAccount, useConnect, useDisconnect, useContractRead, useProvider, usePrepareContractWrite, useContractWrite, useWaitForTransaction, goerli } from 'wagmi'
 import password_manager_info from "../artifacts/src/passwordManager.sol/PasswordManager.json";
 import { PasswordManager } from '../typechain-types'
+import { polygon } from '@wagmi/core/chains'
 import { decrypt, DecryptionOutput, getCalldataFromMessage } from '../utils/zkutils'
 import { info } from 'console'
+import { setEnvironmentData } from 'worker_threads'
+import { waitForDebugger } from 'inspector'
 const password_manager_abi = password_manager_info.abi;
 
 const inter = Inter({ subsets: ['latin'] })
@@ -74,21 +77,24 @@ modalSubtext.set(page.DELETE, "");
 modalSubtext.set(page.LOADING, "Please wait while we load your data from the blockchain. This may take a few seconds.");
 modalSubtext.set(page.LOGGED_OUT, "Please connect your wallet to continue.");
 
+const PASSWORD_MANAGER_ADDRESS = '0xe9e4DCDE4e457aB3b4765b1C2897A9fA60D61deE';
+
 export default function Home() {
   const { address, isConnecting, isConnected, isDisconnected, connector: activeConnector  } = useAccount();
   const { connect, connectors, error, pendingConnector } = useConnect({
-    chainId: goerli.id
+    chainId: polygon.id
   });
   const { disconnect } = useDisconnect();
 
   const { data, error: contractError, isLoading, isSuccess: contractIsSuccess, refetch }: 
-    {data: any, error: Error | null, isLoading: boolean, isSuccess: boolean, refetch: any} = useContractRead({
-    address: '0x625CF7F4D881DcE8831e062F806267506F8050A1',
+    {data: PasswordManager.AccountInfoViewStructOutput[] | undefined, error: Error | null, isLoading: boolean, isSuccess: boolean, refetch: any} = useContractRead({
+    address: PASSWORD_MANAGER_ADDRESS,
     abi: password_manager_abi,
     functionName: 'fetchAllAccountInfo',
     overrides: { from: address },
     onSettled(data, error) {
       console.log('Settled read', { data, error })
+      console.log("Address", address);
     },
   });
 
@@ -102,7 +108,7 @@ export default function Home() {
 
   let [pageState, setPageState] = useState<page>(isConnected ? page.PULL : page.LOGGED_OUT);
   const { config, error: writeError } = usePrepareContractWrite({
-    address: '0x625CF7F4D881DcE8831e062F806267506F8050A1',
+    address: PASSWORD_MANAGER_ADDRESS,
     abi: password_manager_abi,
     functionName: 'updateAccountInfo',
     args: params,
@@ -113,7 +119,7 @@ export default function Home() {
   })
 
   const { config: deleteConfig, error: deleteError } = usePrepareContractWrite({
-    address: '0x625CF7F4D881DcE8831e062F806267506F8050A1',
+    address: PASSWORD_MANAGER_ADDRESS,
     abi: password_manager_abi,
     functionName: 'deleteAccountInfo',
     args: [rawLabelToDelete],
@@ -150,6 +156,8 @@ export default function Home() {
       console.log("Success", data);
       setRawLabelToDelete("");
       setParams(undefined);
+      // sleep for 1 second
+      await new Promise(r => setTimeout(r, 1000));
       await refetch();
       setPageState(page.PULL);
       setReadyToCall(false);
@@ -158,6 +166,8 @@ export default function Home() {
 
   useEffect(() => {
     console.log("Data updated", data, isLoading, contractIsSuccess);
+    if (data == undefined) {
+    }
   }, [data, isLoading, contractIsSuccess])
 
   useEffect(() => {
@@ -181,7 +191,7 @@ export default function Home() {
       setPageState(page.LOADING);
       console.log("Data", data);
       let wasmBuffer = await readRemoteFile(wasm_buffer); // Should probably do this on page load, just incorporate as an inline resource
-      const decrypted = await decrypt(data, privateKey, wasmBuffer);
+      const decrypted = await decrypt(data!, privateKey, wasmBuffer);
       setDecryptedInfo(decrypted);
       console.log(decrypted);
       setPageState(page.VIEW);

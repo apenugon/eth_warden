@@ -1,13 +1,11 @@
-// @Author: akulkid
+// @Author: Akul Penugonda (Github: apenugon)
 // License: GPL-3.0
 
 pragma solidity ^0.8.0;
 
 import { Verifier } from "./verifier.sol";
 
-import "oz/contracts/proxy/utils/Initializable.sol";
-
-contract PasswordManager is Initializable {
+contract PasswordManager {
     Verifier public verifier;
 
     // Struct to hold username, password, and nonce
