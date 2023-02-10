@@ -54,6 +54,6 @@ if (process.env.GOERLI_PRIVATE_KEY) {
       url: `https://polygon-mainnet.g.alchemy.com/v2/n86sM1cw1JPxN4u-Lu9BHp81qNT7CUCI`,
       accounts: [process.env.GOERLI_PRIVATE_KEY!],
     }
-  },
+  }
 }
 export default config;
