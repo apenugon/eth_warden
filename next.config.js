@@ -22,7 +22,7 @@ const nextConfig = {
     });
     return config
   },
-  assetPrefix: !debug ? 'https://anotherplanet-io.github.io/Next-React-Components/' : ''
+  assetPrefix: prod ? 'https://https://apenugon.github.io/eth_warden/' : ''
 }
 
 module.exports = nextConfig
