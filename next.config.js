@@ -22,7 +22,7 @@ const nextConfig = {
     });
     return config
   },
-  assetPrefix: prod ? 'https://https://apenugon.github.io/eth_warden/' : ''
+  assetPrefix: prod ? 'https://apenugon.github.io/eth_warden/' : ''
 }
 
 module.exports = nextConfig
