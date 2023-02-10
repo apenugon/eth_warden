@@ -1,26 +1,15 @@
 import Head from 'next/head'
-import Image from 'next/image'
 import { Inter } from '@next/font/google'
-import styles from '../styles/Home.module.css'
 import { Alert, AlertIcon, Box, Button, Container, FormControl, FormHelperText, FormLabel, Heading, Input, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Text } from '@chakra-ui/react'
-import witness_gen from '../circuits/cc_prove_decryption/prove_decryption_js/witness_calculator'
 // @ts-ignore
 import wasm_buffer from '../circuits/cc_prove_decryption/prove_decryption_js/prove_decryption.wasm';
-import { read, readFileSync } from 'fs'
 const snarkjs = require('snarkjs')
-import testWitnessInput from '../circuits/cc_prove_decryption/input.json';
-import dataUriToBuffer from 'data-uri-to-buffer'
-import { connect } from '@wagmi/core'
-import { InjectedConnector } from '@wagmi/core/connectors/injected'
 import { SetStateAction, useEffect, useState } from 'react'
 import { useAccount, useConnect, useDisconnect, useContractRead, useProvider, usePrepareContractWrite, useContractWrite, useWaitForTransaction, goerli } from 'wagmi'
 import password_manager_info from "../artifacts/src/passwordManager.sol/PasswordManager.json";
 import { PasswordManager } from '../typechain-types'
 import { polygon } from '@wagmi/core/chains'
 import { decrypt, DecryptionOutput, getCalldataFromMessage } from '../utils/zkutils'
-import { info } from 'console'
-import { setEnvironmentData } from 'worker_threads'
-import { waitForDebugger } from 'inspector'
 const password_manager_abi = password_manager_info.abi;
 
 const inter = Inter({ subsets: ['latin'] })
@@ -41,17 +30,6 @@ async function readRemoteFile (file: string) {
   }
   return toBuffer(await response.arrayBuffer());
 }
-
-async function displayHash() {
-  let wasmBuffer = await readRemoteFile(wasm_buffer);
-  let calc = await witness_gen(wasmBuffer);
-  console.log("Jere");
-  console.log(testWitnessInput);
-  const buff = await calc.calculateWitness(testWitnessInput, 0);
-  console.log(buff);
-  alert("Hello, world!");
-}
-
 
 enum page {
   VIEW,
@@ -243,44 +221,52 @@ export default function Home() {
 
   return (
     <>
+    <Head>
+      <title>EthWarden</title>
+    </Head>
     <Container bg="pink.400" h="full" rounded="3xl" mt={10} pb={6} shadow="md">
-<Text fontSize="6xl" padding={6} textAlign="center" color="white">ETHWarden</Text>
+    <Text fontSize="6xl" padding={6} textAlign="center" color="white">ETHWarden</Text>
 <Container centerContent bg="purple.200" rounded="lg" shadow="md">
-    <Box p={8}>
+  <Box p={8}>
+    {!isConnected && 
+      <>
         <Heading textAlign="center" as="h4" fontSize="2xl" color="gray.700">Connect your Wallet to securely* store your passwords on the blockchain.</Heading>
-        {connectors.map((connector) => (
-            <Button
-                hidden={isConnected || pageState != page.LOGGED_OUT}
-                key={connector.id}
-                size="lg"
-                variant="outline"
-                m={4}
-                onClick={() => {
-                    connect({ connector });
-                    setPageState(page.PULL);
-                }}
-            >
-                Connect Wallet
-                {isLoading &&
-                    pendingConnector?.id === connector.id &&
-                    ' (connecting)'}
-            </Button>
-        ))}
-        <Button
-            hidden={!isConnected || pageState == page.LOGGED_OUT}
-            size="lg"
-            variant="outline"
-            m={4}
-            onClick={() => {
-                disconnect()
-                setPageState(page.LOGGED_OUT);
-            }}
-        >
-            Disconnect
-        </Button>
-        {isConnected && <Text fontSize="lg" mt={4} fontWeight="bold">Connected Wallet: {address}</Text>}
-        {error && <Alert status="error" mt={4}>{error.message}</Alert>}
-    </Box>
+        <Text fontSize="md" mt={2} color="gray.500">Note: Currently, this app only supports Polygon - will put this up on mainnet if there is interest too.</Text>
+      </>
+    }
+    {connectors.map((connector) => (
+      <Button
+        hidden={isConnected || pageState != page.LOGGED_OUT}
+        key={connector.id}
+        size="lg"
+        variant="outline"
+        m={4}
+        onClick={() => {
+          connect({ connector });
+          setPageState(page.PULL);
+        }}
+      >
+        Connect Wallet
+        {isLoading &&
+          pendingConnector?.id === connector.id &&
+          ' (connecting)'}
+      </Button>
+    ))}
+    <Button
+      hidden={!isConnected || pageState == page.LOGGED_OUT}
+      size="lg"
+      variant="outline"
+      m={4}
+      onClick={() => {
+        disconnect()
+        setPageState(page.LOGGED_OUT);
+      }}
+    >
+      Disconnect
+    </Button>
+    {isConnected && <Text fontSize="lg" mt={4} fontWeight="bold">Connected Wallet: {address}</Text>}
+    {error && <Alert status="error" mt={4}>{error.message}</Alert>}
+  </Box>
 </Container>
       {isConnected && 
       (
@@ -289,7 +275,7 @@ export default function Home() {
     { decryptedInfo.length == 0 && pageState == page.VIEW && 
 
     <Box mt={4} p={4} shadow="md" bg="white" rounded="lg">
-      <Text textAlign="center" fontSize="lg">No passwords stored! Try a different chain?</Text>
+      <Text textAlign="center" fontSize="lg">No passwords stored! Try refreshing or storing your first password.</Text>
     </Box>
     }
     {decryptedInfo.map((info) => (

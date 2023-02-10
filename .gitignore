@@ -5,6 +5,7 @@
 /typechain-types/
 /.vscode/
 /.openzeppelin/
+/export/
 # dependencies
 /node_modules
 /.pnp

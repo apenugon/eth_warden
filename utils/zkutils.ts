@@ -2,10 +2,9 @@ const snarkjs = require('snarkjs');
 
 let wasm_location = "../wasm/pkg-web/wasm"
 
-import { generate_encrypt_info, decrypt_infos, generate_binary_key_from_password } from "../wasm/pkg-web/wasm";
+//import { generate_encrypt_info, decrypt_infos, generate_binary_key_from_password } from "../wasm/pkg-web/wasm";
 
 import witness_gen from '../circuits/cc_prove_decryption/prove_decryption_js/witness_calculator'
-
 
 //import { generate_key_from_password, generate_encrypt_info } from wasm_location;
 //const processing_module = require(wasm_location);
@@ -47,6 +46,7 @@ export async function getCalldataFromMessage(
         [string, string, string], 
         string, 
         string]> {
+            const { generate_encrypt_info, decrypt_infos, generate_binary_key_from_password } = await import("../wasm/pkg-web/wasm");
 
             let utf8_username = Buffer.from(username, 'utf8').toString();
             let utf8_label = Buffer.from(account_label, 'utf8').toString();
@@ -92,6 +92,8 @@ var binArrayToJson = function(binArray: Uint8Array) {
 }
 
 export async function decrypt(infos: PasswordManager.AccountInfoViewStructOutput[], encryption_password: string, wasm_buffer: undefined | any): Promise<DecryptionOutput[]> {
+    const { generate_encrypt_info, decrypt_infos, generate_binary_key_from_password } = await import("../wasm/pkg-web/wasm");
+   
     // Eventually wrap in some try catch
     if (wasm_buffer == undefined) {
         const fs = require('fs');
