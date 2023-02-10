@@ -6,24 +6,16 @@ import type { NetworkUserConfig } from "hardhat/types";
 import { resolve } from "path";
 import "hardhat-preprocessor";
 import fs from "fs";
-//import "@foundry-rs/hardhat-forge";
 import "@foundry-rs/hardhat-anvil";
 import "@openzeppelin/hardhat-upgrades";
 import dotenv from "dotenv";
 dotenv.config({path:__dirname+'/.env'})
 
-/*
-function getRemappings() {
-  return fs
-    .readFileSync("remappings.txt", "utf8")
-    .split("\n")
-    .filter(Boolean) // remove empty lines
-    .map((line) => line.trim().split("="));
-}*/
 
 const config: HardhatUserConfig = {
   solidity: "0.8.17",
   defaultNetwork: "anvil",
+  // @ts-ignore
   anvil: {
     launch: false,
   },
@@ -33,11 +25,11 @@ const config: HardhatUserConfig = {
   networks: {
     goerli: {
       url: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [process.env.GOERLI_PRIVATE_KEY],
+      accounts: [process.env.GOERLI_PRIVATE_KEY!],
     },
     polygon: {
       url: `https://polygon-mainnet.g.alchemy.com/v2/n86sM1cw1JPxN4u-Lu9BHp81qNT7CUCI`,
-      accounts: [process.env.GOERLI_PRIVATE_KEY],
+      accounts: [process.env.GOERLI_PRIVATE_KEY!],
     }
   },
   /*

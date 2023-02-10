@@ -17,8 +17,6 @@ describe("PasswordManagerTests", function () {
         console.log(passwordManager.address);
         expect(await passwordManager.address).not.to.deep.equal("");
         expect(await passwordManager.verifier()).to.deep.equal("")
-        const tx = await passwordManager.initialize();
-        expect((await tx.wait(1)).confirmations).to.deep.equal(1);
         expect(await passwordManager.verifier()).not.to.deep.equal("");
     });
     
@@ -28,7 +26,6 @@ describe("PasswordManagerTests", function () {
         const PasswordManager = await hre.ethers.getContractFactory("PasswordManager");
         const passwordManager = await PasswordManager.deploy();
         await passwordManager.deployed();
-        await passwordManager.initialize();
 
         let params = await getCalldataFromMessage(
             "testuser", 

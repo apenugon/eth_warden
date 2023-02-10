@@ -373,7 +373,7 @@ Submit
 <Box bg="gray.200" p={4} rounded="lg" mt={4}>
   <Text fontSize="sm" color="gray.500">Disclaimer:</Text>
   <Text fontSize="sm" mt={2}>
-  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app's source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
+  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app{"'"}s source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
 </Box>
 
   </Container>
