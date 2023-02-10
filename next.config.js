@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+
+const prod = process.env.NODE_ENV === 'production'
 const nextConfig = {
   typescript: {
     // !! WARN !!
@@ -20,6 +22,7 @@ const nextConfig = {
     });
     return config
   },
+  assetPrefix: !debug ? 'https://anotherplanet-io.github.io/Next-React-Components/' : ''
 }
 
 module.exports = nextConfig
