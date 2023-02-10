@@ -2,7 +2,7 @@ import Head from 'next/head'
 import Image from 'next/image'
 import { Inter } from '@next/font/google'
 import styles from '../styles/Home.module.css'
-import { Box, Button, FormControl, FormHelperText, FormLabel, Input, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Text } from '@chakra-ui/react'
+import { Alert, AlertIcon, Box, Button, Container, FormControl, FormHelperText, FormLabel, Heading, Input, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Text } from '@chakra-ui/react'
 import witness_gen from '../circuits/cc_prove_decryption/prove_decryption_js/witness_calculator'
 // @ts-ignore
 import wasm_buffer from '../circuits/cc_prove_decryption/prove_decryption_js/prove_decryption.wasm';
@@ -243,104 +243,140 @@ export default function Home() {
 
   return (
     <>
- 
-    {connectors.map((connector) => (
+    <Container bg="pink.400" h="full" rounded="3xl" mt={10} pb={6} shadow="md">
+<Text fontSize="6xl" padding={6} textAlign="center" color="white">ETHWarden</Text>
+<Container centerContent bg="purple.200" rounded="lg" shadow="md">
+    <Box p={8}>
+        <Heading textAlign="center" as="h4" fontSize="2xl" color="gray.700">Connect your Wallet to securely* store your passwords on the blockchain.</Heading>
+        {connectors.map((connector) => (
+            <Button
+                hidden={isConnected || pageState != page.LOGGED_OUT}
+                key={connector.id}
+                size="lg"
+                variant="outline"
+                m={4}
+                onClick={() => {
+                    connect({ connector });
+                    setPageState(page.PULL);
+                }}
+            >
+                Connect Wallet
+                {isLoading &&
+                    pendingConnector?.id === connector.id &&
+                    ' (connecting)'}
+            </Button>
+        ))}
         <Button
-          hidden={isConnected || pageState != page.LOGGED_OUT}
-          key={connector.id}
-          onClick={() => { 
-            connect({ connector }); 
-            setPageState(page.PULL);
-          }}
+            hidden={!isConnected || pageState == page.LOGGED_OUT}
+            size="lg"
+            variant="outline"
+            m={4}
+            onClick={() => {
+                disconnect()
+                setPageState(page.LOGGED_OUT);
+            }}
         >
-          Connect Wallet
-          {isLoading &&
-            pendingConnector?.id === connector.id &&
-            ' (connecting)'}
+            Disconnect
         </Button>
-      ))}
-   <Button
-      hidden={!isConnected || pageState == page.LOGGED_OUT}
-      onClick={() => { 
-        disconnect()
-        setPageState(page.LOGGED_OUT);
-      }}
-    >
-      Disconnect
-    </Button>
-    { isConnected && <div>{address}</div>}
-      { error && <div>{error.message}</div> }
-
+        {isConnected && <Text fontSize="lg" mt={4} fontWeight="bold">Connected Wallet: {address}</Text>}
+        {error && <Alert status="error" mt={4}>{error.message}</Alert>}
+    </Box>
+</Container>
       {isConnected && 
       (
       <>
-    <Box>
-    { decryptedInfo.length == 0 && pageState == page.VIEW && <div>No passwords stored! Try a different chain?</div>}
+    <Box p={8} mt={8}>
+    { decryptedInfo.length == 0 && pageState == page.VIEW && 
+
+    <Box mt={4} p={4} shadow="md" bg="white" rounded="lg">
+      <Text textAlign="center" fontSize="lg">No passwords stored! Try a different chain?</Text>
+    </Box>
+    }
     {decryptedInfo.map((info) => (
-        <Box key={info.rawLabel} my={2} p={2} shadow="md">
+        <Box key={info.rawLabel} mt={4} p={4} shadow="md" bg="white" rounded="lg">
             <Text fontWeight="bold">{info.label}</Text>
-            <Text>Username: {info.username}</Text>
-            <Text>Password: {info.password}</Text>
+            <Text mt={2} fontSize="md">Username: {info.username}</Text>
+            <Text mt={2} fontSize="md">Password: {info.password}</Text>
+            <Box mt={4} display="flex" justifyContent="flex-end">
             <Button onClick={() => handleUpdateButton(info)} disabled={pageState != page.VIEW}>
-                Update
+            Update
             </Button>
-            <Button onClick={() => handleDeleteButton(info)} disabled={pageState != page.VIEW}>
-                Delete
+            <Button ml={4} onClick={() => handleDeleteButton(info)} disabled={pageState != page.VIEW}>
+            Delete
             </Button>
+            </Box>
         </Box>
     ))}
     </Box>
-    <Button onClick={() => setPageState(page.CREATE)} disabled={pageState != page.VIEW}>
-
+    
+    <Button
+    onClick={() => setPageState(page.CREATE)}
+    disabled={pageState !== page.VIEW}
+    >
     Create
-    </Button>
-    { contractError && <div>{contractError.message}</div> }
+  </Button>
+  <Button
+    onClick={() => setPageState(page.PULL)}
+    disabled={pageState !== page.VIEW}
+    >
+    Refresh Accounts
+  </Button>
+  {contractError &&  <Alert status="error" mt={2}>
+  <AlertIcon />
+  {contractError.message}
+</Alert> }
 
-    <Modal isOpen={pageState != page.VIEW} onClose={() => setPageState(page.VIEW)}>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>{modalHeader.get(pageState)}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <p>{modalSubtext.get(pageState)}</p>
-          { pageState != page.LOADING && pageState != page.DELETE &&
-          <>
-          <FormControl aria-autocomplete='none'>
-            <FormLabel htmlFor="privateKey">Master Password</FormLabel>
-            <Input type="password" id="privateKey" value={privateKey} onChange={event => setPrivateKey(event.target.value)} />
-          </FormControl> 
-          { (pageState == page.CREATE || pageState == page.UPDATE) && <>
-          { pageState == page.CREATE && <div>Creating new saved password</div> }
-          { pageState == page.UPDATE && <div>Updating password for {infoToAddUpdate.label}</div> }
-          <FormControl aria-autocomplete='none'>{ pageState == page.CREATE && <>
-              <FormLabel htmlFor="label">Label</FormLabel>
-              <Input type="text" id="label" value={infoToAddUpdate.label} onChange={event => setInfoToAddUpdate({...infoToAddUpdate, label: event.target.value})} /> 
-            </>}
-            <FormLabel htmlFor="username">Username</FormLabel>
-            <Input type="text" id="username" value={infoToAddUpdate.username} onChange={event => setInfoToAddUpdate({...infoToAddUpdate, username: event.target.value})} />
-            <FormLabel htmlFor="password">Password</FormLabel>
-            <Input type="text" id="password" value={infoToAddUpdate.password} onChange={event => setInfoToAddUpdate({...infoToAddUpdate, password: event.target.value})} />
-          </FormControl> 
-          </>
-          }
-          </>
-          }
-          { pageState == page.DELETE && <div>Are you sure you want to delete?</div> }
-          { transactionLoading && <div>Transaction in progress, waiting for confirmation...</div> }
-          { isLoading && <div>Reading latest accounts from chain...</div> }
-        </ModalBody>
-        <ModalFooter>
-          <Button type="submit" onClick={() => handleSubmit()} disabled={pageState == page.LOADING}>
-            Submit
-          </Button>
-          { pageState == page.LOADING && readyToCall &&
-          <Button onClick={handleExecuteTx} disabled={transactionLoading}>Execute transaction</Button>
-          }
-        </ModalFooter>
-      </ModalContent>
-    </Modal></>)
+<Modal isOpen={pageState !== page.VIEW} onClose={() => setPageState(page.VIEW)}>
+<ModalOverlay />
+<ModalContent>
+<ModalHeader fontWeight="bold">{modalHeader.get(pageState)}</ModalHeader>
+<ModalCloseButton />
+<ModalBody p={6}>
+<Text fontSize="sm">{modalSubtext.get(pageState)}</Text>
+{ pageState !== page.LOADING && pageState !== page.DELETE &&
+<FormControl aria-autocomplete='none'>
+<FormLabel htmlFor="privateKey">Master Password</FormLabel>
+<Input type="password" id="privateKey" value={privateKey} onChange={event => setPrivateKey(event.target.value)} />
+</FormControl>
+}
+{ (pageState === page.CREATE || pageState === page.UPDATE) &&
+<FormControl aria-autocomplete='none'>
+<FormLabel htmlFor="label">Label</FormLabel>
+<Input type="text" id="label" value={infoToAddUpdate.label} onChange={event => setInfoToAddUpdate({...infoToAddUpdate, label: event.target.value})} />
+<FormLabel htmlFor="username">Username</FormLabel>
+<Input type="text" id="username" value={infoToAddUpdate.username} onChange={event => setInfoToAddUpdate({...infoToAddUpdate, username: event.target.value})} />
+<FormLabel htmlFor="password">Password</FormLabel>
+<Input type="text" id="password" value={infoToAddUpdate.password} onChange={event => setInfoToAddUpdate({...infoToAddUpdate, password: event.target.value})} />
+</FormControl>
+}
+{ pageState === page.DELETE &&
+<Text fontSize="sm">Are you sure you want to delete?</Text>
+}
+{ transactionLoading &&
+<Text fontSize="sm">Transaction in progress, waiting for confirmation...</Text>
+}
+{ isLoading &&
+<Text fontSize="sm">Reading latest accounts from chain...</Text>
+}
+</ModalBody>
+<ModalFooter>
+<Button onClick={() => handleSubmit()} isDisabled={pageState === page.LOADING}>
+Submit
+</Button>
+{ pageState === page.LOADING && readyToCall &&
+<Button onClick={handleExecuteTx} isDisabled={transactionLoading}>Execute transaction</Button>
+}
+</ModalFooter>
+</ModalContent>
+</Modal></>)
     }
+<Box bg="gray.200" p={4} rounded="lg" mt={4}>
+  <Text fontSize="sm" color="gray.500">Disclaimer:</Text>
+  <Text fontSize="sm" mt={2}>
+  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app's source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
+</Box>
 
+  </Container>
     </>
   )
 }
