@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "bash setup_dirs_and_rust.sh && hardhat build && next build && next export -o export",
+    "build": "bash setup_dirs_and_rust.sh && hardhat compile && next build && next export -o export",
     "start": "next start",
     "lint": "next lint --fix",
     "test": "hardhat test",
