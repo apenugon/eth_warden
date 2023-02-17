@@ -1,16 +1,21 @@
 import Head from 'next/head'
 import { Inter } from '@next/font/google'
-import { Alert, AlertIcon, Box, Button, Container, FormControl, FormHelperText, FormLabel, Heading, Input, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Text } from '@chakra-ui/react'
+import { Alert, AlertIcon, Box, Button, Container, FormControl, FormHelperText, FormLabel, Heading, Input, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, Progress, Text } from '@chakra-ui/react'
 // @ts-ignore
 import wasm_buffer from '../circuits/cc_prove_decryption/prove_decryption_js/prove_decryption.wasm';
 const snarkjs = require('snarkjs')
-import { SetStateAction, useEffect, useState } from 'react'
+import { SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount, useConnect, useDisconnect, useContractRead, useProvider, usePrepareContractWrite, useContractWrite, useWaitForTransaction, goerli } from 'wagmi'
 import password_manager_info from "../artifacts/src/passwordManager.sol/PasswordManager.json";
 import { PasswordManager } from '../typechain-types'
 import { polygon } from '@wagmi/core/chains'
 import { decrypt, DecryptionOutput, getCalldataFromMessage } from '../utils/zkutils'
+import localforage from 'localforage';
+import { abort } from 'process';
+import { DownloadMessage } from '../utils/download-zkey';
 const password_manager_abi = password_manager_info.abi;
+
+
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -82,7 +87,30 @@ export default function Home() {
   const [params, setParams] = useState< [[string, string], [[string, string], [string, string]], [string, string], [string, string, string], string, string]>();
   const [readyToCall, setReadyToCall] = useState<boolean>(false);
   const [rawLabelToDelete, setRawLabelToDelete] = useState<string>("");
+  
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [dataIsStored, setDataIsStored] = useState<boolean>(false);
 
+  const workerRef = useRef<Worker>()
+  
+  const startDownload = async () => {
+
+    setIsDownloading(true);
+    const messageToSend: DownloadMessage = {
+      type: "started",
+    };
+    workerRef.current?.postMessage(messageToSend);
+    
+  };
+
+  const cancelDownload = () => {
+    const messageToSend: DownloadMessage = {
+      type: "cancelled",
+    };
+    workerRef.current?.postMessage(messageToSend);
+    setIsDownloading(false);
+  };
 
   let [pageState, setPageState] = useState<page>(isConnected ? page.PULL : page.LOGGED_OUT);
   const { config, error: writeError } = usePrepareContractWrite({
@@ -141,6 +169,41 @@ export default function Home() {
       setReadyToCall(false);
     }    
   })
+
+  // Initialization
+  useEffect(() => {
+    console.log("Initialize");
+    const callback = (err: any, value: any) => {
+      console.log("In callback", value);
+      if (err) {
+        console.error(err);
+      } else if (value) {
+        setDataIsStored(true);
+      }
+    }
+    localforage.getItem("circuit_final.zkey", callback);
+    workerRef.current = new Worker(new URL('../utils/download-zkey.ts', import.meta.url))
+    workerRef.current.onmessage = (event: MessageEvent<DownloadMessage>) => {
+      switch (event.data.type) {
+        case 'progress':
+          setDownloadProgress(event.data.progress!)
+          break
+        case 'done':
+          setDataIsStored(true);
+          setIsDownloading(false)
+          break
+        case 'error':
+          console.error(event.data.error)
+          setIsDownloading(false)
+          break
+      }
+    }
+
+    return () => {
+      workerRef.current!.terminate()
+    }
+
+  }, []);
 
   useEffect(() => {
     console.log("Data updated", data, isLoading, contractIsSuccess);
@@ -226,6 +289,11 @@ export default function Home() {
     </Head>
     <Container bg="pink.400" h="full" rounded="3xl" mt={10} pb={6} shadow="md">
     <Text fontSize="6xl" padding={6} textAlign="center" color="white">ETHWarden</Text>
+
+
+    {dataIsStored ? (
+        <>
+        
 <Container centerContent bg="purple.200" rounded="lg" shadow="md">
   <Box p={8}>
     {!isConnected && 
@@ -361,6 +429,21 @@ Submit
   <Text fontSize="sm" mt={2}>
   *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app{"'"}s source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
 </Box>
+        </>
+      ) : (
+        <div>
+          <Button onClick={startDownload} isDisabled={isDownloading}>
+            Start Download
+          </Button>
+          {isDownloading && (
+            <div>
+              <Progress value={downloadProgress} />
+              <Button onClick={cancelDownload}>Cancel Download</Button>
+            </div>
+          )}
+        </div>
+      )}
+      
 
   </Container>
     </>

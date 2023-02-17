@@ -12,6 +12,7 @@ import witness_gen from '../circuits/cc_prove_decryption/prove_decryption_js/wit
 import { formatBytes32String } from "ethers/lib/utils";
 import { PasswordManager } from "../typechain-types";
 import { isConstructorDeclaration } from "typescript";
+import localforage from 'localforage';
 
 export type DecryptionInput = {
     username: string,
@@ -59,7 +60,11 @@ export async function getCalldataFromMessage(
             console.log(info);
             console.log(formatBytes32String(utf8_username))
             let prover_path = "prove_encryption.wasm";
-            let circuit_path = "circuit_final.zkey";
+            // We can pass in the raw bytes, abstracting away storage from the user.
+            let circuit_path: Uint8Array | string | null = await localforage.getItem<Uint8Array>('circuit_final.zkey');
+            if (!circuit_path) {
+                throw new Error("Circuit not found");
+            }
             if (typeof window === 'undefined') {
                 prover_path = "public/prove_encryption.wasm";
                 circuit_path = "public/circuit_final.zkey";
