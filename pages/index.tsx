@@ -99,7 +99,7 @@ export default function Home() {
     setIsDownloading(true);
     const messageToSend: DownloadMessage = {
       type: "started",
-      url: window.location + "/circuit_final.zkey"
+      url: window.location.toString()
     };
     workerRef.current?.postMessage(messageToSend);
     
@@ -437,7 +437,7 @@ Submit
           </Button>
           {isDownloading && (
             <div>
-              <Progress value={downloadProgress} />
+              <Progress value={downloadProgress*100} />
               <Button onClick={cancelDownload}>Cancel Download</Button>
             </div>
           )}
