@@ -14,7 +14,7 @@ import localforage from 'localforage';
 import { abort } from 'process';
 import { DownloadMessage } from '../utils/download-zkey';
 const password_manager_abi = password_manager_info.abi;
-
+import { ethers } from 'ethers';
 
 
 const inter = Inter({ subsets: ['latin'] })
@@ -310,7 +310,47 @@ export default function Home() {
         size="lg"
         variant="outline"
         m={4}
-        onClick={() => {
+        onClick={async () => {
+          if (window.ethereum) {
+            try {
+              // Try to switch to the Mumbai testnet
+              await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0x89' }], // Check networks.js for hexadecimal network ids
+              });
+            } catch (error) {
+              // This error code means that the chain we want has not been added to MetaMask
+              // In this case we ask the user to add it to their MetaMask
+              // @ts-ignore
+              if (error.code === 4902) {
+                try {
+                  await window.ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [
+                      {
+                        chainId: "0x89",
+                        chainName: "Polygon Mainnet",
+                        nativeCurrency: {
+                          name: "MATIC",
+                          symbol: "MATIC",
+                          decimals: 18
+                        },
+                        rpcUrls: ["https://rpc-mainnet.maticvigil.com/"],
+                        blockExplorerUrls: ["https://polygonscan.com/"]
+                      },
+                    ],
+                  });
+                } catch (error) {
+                  console.log(error);
+                }
+              }
+              console.log(error);
+            }
+          } else {
+            // If window.ethereum is not found then MetaMask is not installed
+            alert('MetaMask is not installed. Please install it to use this app: https://metamask.io/download.html');
+          } 
+
           connect({ connector });
           setPageState(page.PULL);
         }}
