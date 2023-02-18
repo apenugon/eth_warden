@@ -99,6 +99,7 @@ export default function Home() {
     setIsDownloading(true);
     const messageToSend: DownloadMessage = {
       type: "started",
+      url: window.location + "/circuit_final.zkey"
     };
     workerRef.current?.postMessage(messageToSend);
     
@@ -424,14 +425,13 @@ Submit
 </ModalContent>
 </Modal></>)
     }
-<Box bg="gray.200" p={4} rounded="lg" mt={4}>
-  <Text fontSize="sm" color="gray.500">Disclaimer:</Text>
-  <Text fontSize="sm" mt={2}>
-  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app{"'"}s source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
-</Box>
         </>
       ) : (
         <div>
+                <>
+        <Heading textAlign="center" as="h4" fontSize="2xl" color="gray.700">Start storing your passwords on EthWarden. Download the app first - you will only need to do this once per device.</Heading>
+        <Text fontSize="md" mt={2} color="gray.500">Note: Currently, this app only supports Polygon - will put this up on mainnet if there is interest too.</Text>
+      </>
           <Button onClick={startDownload} isDisabled={isDownloading}>
             Start Download
           </Button>
@@ -444,6 +444,11 @@ Submit
         </div>
       )}
       
+<Box bg="gray.200" p={4} rounded="lg" mt={4}>
+  <Text fontSize="sm" color="gray.500">Disclaimer:</Text>
+  <Text fontSize="sm" mt={2}>
+  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app{"'"}s source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
+</Box>
 
   </Container>
     </>

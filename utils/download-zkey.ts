@@ -3,6 +3,7 @@ import localforage from 'localforage';
 
 export type DownloadMessage = {
     type: 'progress' | 'done' | 'error' | 'cancelled' | 'started';
+    url?: string;
     progress?: number;
     data?: Uint8Array;
     error?: Error;
@@ -19,7 +20,7 @@ self.onmessage = async (event: MessageEvent<DownloadMessage>) => {
                 if (isDownloading)
                     throw new Error('Already downloading');
                 isDownloading = true;
-                const response = await fetch("http://localhost:3000/circuit_final.zkey", {
+                const response = await fetch(event.data.url!, {
                   signal: abortController!.signal
                 });
                 if (!response.ok) {
@@ -78,8 +79,3 @@ self.onmessage = async (event: MessageEvent<DownloadMessage>) => {
 
     
 }
-  
-
-const startDownload = async () => {
-    
-  };
