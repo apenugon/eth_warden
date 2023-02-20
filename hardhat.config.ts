@@ -1,14 +1,14 @@
 /** @type import('hardhat/config').HardhatUserConfig */
-import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-foundry";
-import type { HardhatUserConfig } from "hardhat/config";
-import type { NetworkUserConfig } from "hardhat/types";
-import { resolve } from "path";
-import "hardhat-preprocessor";
-import fs from "fs";
-import "@foundry-rs/hardhat-anvil";
-import "@openzeppelin/hardhat-upgrades";
-import dotenv from "dotenv";
+require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-foundry");
+require("hardhat/config");
+const { HardhatUserConfig } = require("hardhat/types");
+const { resolve } = require("path");
+require("hardhat-preprocessor");
+const fs = require("fs");
+require("@foundry-rs/hardhat-anvil");
+require("@openzeppelin/hardhat-upgrades");
+const dotenv =require("dotenv");
 dotenv.config({path:__dirname+'/.env'})
 
 
@@ -56,4 +56,5 @@ if (process.env.GOERLI_PRIVATE_KEY) {
     }
   }
 }
-export default config;
+
+module.exports = config;
