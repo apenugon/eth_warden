@@ -15,6 +15,7 @@ import { abort } from 'process';
 import { DownloadMessage } from '../utils/download-zkey';
 const password_manager_abi = password_manager_info.abi;
 import { ethers } from 'ethers';
+import Link from 'next/link';
 
 
 const inter = Inter({ subsets: ['latin'] })
@@ -54,13 +55,13 @@ modalHeader.set(page.LOADING, "Loading data...");
 modalHeader.set(page.LOGGED_OUT, "Please connect your wallet");
 const modalSubtext = new Map<page, string>();
 modalSubtext.set(page.PULL, "This will decrypt all of your account info and display it on the screen. Please pick a master password that is long and secure. We use a password hashing scheme on the backend so your AES password is tough to guess, but the longer and more complicated this password is the better.\n\nIMPORTANT: DO NOT FORGET YOUR MASTER PASSWORD OR YOUR PASSWORDS WILL BE UNRECOVERABLE.");
-modalSubtext.set(page.CREATE, "Please enter the account label, your username, and password. This frontend will encrypt the password using a hash of your master password and store it on the blockchain. We will also store the account name on the blockchain.");
+modalSubtext.set(page.CREATE, "Please enter the account label, your username, and password. This frontend will encrypt the password using a hash of your master password and store it on the blockchain. We will also store the account name on the blockchain.\n Please be aware that this data will be stored in its encrypted form on the blockchain, and will *forever* be publically visible in that form. It may be deleted, but nodes will have archived copies.");
 modalSubtext.set(page.UPDATE, "Please enter your updated username and password. This frontend will encrypt the password using a hash of your master password and store it on the blockchain. We will also store the account name on the blockchain.");
 modalSubtext.set(page.DELETE, "");
 modalSubtext.set(page.LOADING, "Please wait while we load your data from the blockchain. This may take a few seconds.");
 modalSubtext.set(page.LOGGED_OUT, "Please connect your wallet to continue.");
 
-const PASSWORD_MANAGER_ADDRESS = '0xe9e4DCDE4e457aB3b4765b1C2897A9fA60D61deE';
+const PASSWORD_MANAGER_ADDRESS = '0xBf30a0f337eF6a64Ae0e39F1596BBFeEC182e348';
 
 export default function Home() {
   const { address, isConnecting, isConnected, isDisconnected, connector: activeConnector  } = useAccount();
@@ -300,9 +301,12 @@ export default function Home() {
     {!isConnected && 
       <>
         <Heading textAlign="center" as="h4" fontSize="2xl" color="gray.700">Connect your Wallet to securely* store your passwords on the blockchain.</Heading>
-        <Text fontSize="md" mt={2} color="gray.500">Note: Currently, this app only supports Polygon - will put this up on mainnet if there is interest too.</Text>
       </>
     }
+    <Text fontSize="md" mt={2} color="gray.700">This app uses a Zero-Knowledge proof to encrypt your password with AES-256 encryption, and stores the password in a smart contract. This contract will only accept password storage if the password has been provably encrypted with AES-256. Therefore, you *know* that your passwords are unable to be broken if they are stored there.</Text>
+    <Text fontSize="md" mt={2} color="gray.600">Note: Currently, this app only supports Polygon - will put this up on mainnet if there is interest too.</Text>
+    <Link href={"https://polygonscan.com/address/"+PASSWORD_MANAGER_ADDRESS}><Button as="a">View contract on PolygonScan</Button></Link>
+    <br/>
     {connectors.map((connector) => (
       <Button
         hidden={isConnected || pageState != page.LOGGED_OUT}
@@ -393,9 +397,6 @@ export default function Home() {
             <Text mt={2} fontSize="md">Username: {info.username}</Text>
             <Text mt={2} fontSize="md">Password: {info.password}</Text>
             <Box mt={4} display="flex" justifyContent="flex-end">
-            <Button onClick={() => handleUpdateButton(info)} disabled={pageState != page.VIEW}>
-            Update
-            </Button>
             <Button ml={4} onClick={() => handleDeleteButton(info)} disabled={pageState != page.VIEW}>
             Delete
             </Button>
@@ -408,7 +409,7 @@ export default function Home() {
     onClick={() => setPageState(page.CREATE)}
     disabled={pageState !== page.VIEW}
     >
-    Create
+    Store
   </Button>
   <Button
     onClick={() => setPageState(page.PULL)}
@@ -470,8 +471,10 @@ Submit
         <div>
                 <>
         <Heading textAlign="center" as="h4" fontSize="2xl" color="gray.700">Start storing your passwords on EthWarden. Download the app first - you will only need to do this once per device.</Heading>
-        <Text fontSize="md" mt={2} color="gray.500">Note: Currently, this app only supports Polygon - will put this up on mainnet if there is interest too.</Text>
-      </>
+        <Text fontSize="md" mt={2} color="gray.700">This app uses a Zero-Knowledge proof to encrypt your password with AES-256 encryption, and stores the password in a smart contract. This contract will only accept password storage if the password has been provably encrypted with AES-256. Therefore, you *know* that your passwords are unable to be broken if they are stored there.</Text>
+        <Text fontSize="md" mt={2} color="gray.600">Note: Currently, this app only supports Polygon - will put this up on mainnet if there is interest too.</Text>
+        <Link href={"https://polygonscan.com/address/"+PASSWORD_MANAGER_ADDRESS}><Button as="a">View contract on PolygonScan</Button></Link>
+    </>
           <Button onClick={startDownload} isDisabled={isDownloading}>
             Start Download
           </Button>
@@ -487,7 +490,7 @@ Submit
 <Box bg="gray.200" p={4} rounded="lg" mt={4}>
   <Text fontSize="sm" color="gray.500">Disclaimer:</Text>
   <Text fontSize="sm" mt={2}>
-  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app{"'"}s source code to ensure its safety before use. You can view the source code at [INSERT LINK HERE]. Please proceed with caution and use this app at your own risk. </Text>
+  *Please be advised that this app is not audited and its security has not been independently verified. By using this app, you understand that you are taking the responsibility to keep your passwords secure and accept the risk of potential security breaches. We encourage users to thoroughly review the app{"'"}s source code to ensure its safety before use. You can view the source code <Link href="https://github.com/apenugon/eth_warden">here</Link>. Please proceed with caution and use this app at your own risk. </Text>
 </Box>
 
   </Container>

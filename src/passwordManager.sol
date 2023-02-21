@@ -43,13 +43,13 @@ contract PasswordManager {
             bytes32 username
         ) public {
 
-        bytes32 encrypted = bytes32((input[0]) + (input[1] << 128));    
-        verifier.verifyProof(a, b, c, input);
+        bytes32 encrypted = bytes32((input[0]) + (input[1] << 128));
         if (passwordData[msg.sender][label].isValue == false) {
             accountList[msg.sender].push(label);
         }
         AccountInfo memory accountInfo = AccountInfo(username, encrypted, input[2], true);
-        passwordData[msg.sender][label] = accountInfo;
+        passwordData[msg.sender][label] = accountInfo;    
+        require(verifier.verifyProof(a, b, c, input));
     }
 
     function deleteAccountInfo(bytes32 label) public {

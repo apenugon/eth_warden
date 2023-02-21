@@ -51,7 +51,7 @@ if (process.env.GOERLI_PRIVATE_KEY) {
       accounts: [process.env.GOERLI_PRIVATE_KEY!],
     },
     polygon: {
-      url: `https://polygon-mainnet.g.alchemy.com/v2/n86sM1cw1JPxN4u-Lu9BHp81qNT7CUCI`,
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
       accounts: [process.env.GOERLI_PRIVATE_KEY!],
     }
   }
